@@ -85,11 +85,17 @@ export function prePush(stdinText, { cwd = process.cwd() } = {}) {
   }
 }
 
-const shimBody = (name) =>
-  `#!/bin/sh\n[ -x "$(dirname "$0")/${name}.local" ] && { "$(dirname "$0")/${name}.local" "$@" || exit $?; }\nexec node "${GUARD}" git ${name} "$@"\n`;
+// pre-push gets the ref list on stdin: buffer it so a chained .local hook and the guard both see it.
+const shimBody = (name) => (name === 'pre-push'
+  ? `#!/bin/sh\ninput=$(cat)\nlocal_hook="$(dirname "$0")/${name}.local"\nif [ -x "$local_hook" ]; then printf '%s\\n' "$input" | "$local_hook" "$@" || exit $?; fi\nprintf '%s\\n' "$input" | node "${GUARD}" git ${name} "$@"\n`
+  : `#!/bin/sh\n[ -x "$(dirname "$0")/${name}.local" ] && { "$(dirname "$0")/${name}.local" "$@" || exit $?; }\nexec node "${GUARD}" git ${name} "$@"\n`);
 
-const isOurShim = (file, name) => {
-  try { return fs.readFileSync(file, 'utf8').includes(`guard.mjs" git ${name} `); } catch { return false; }
+// Matches every shim version we have written (older bodies are upgraded in place).
+const readOurShim = (file, name) => {
+  try {
+    const text = fs.readFileSync(file, 'utf8');
+    return text.includes(`guard.mjs" git ${name} `) ? text : null;
+  } catch { return null; }
 };
 
 export function installShims(repoRoot) {
@@ -101,8 +107,9 @@ export function installShims(repoRoot) {
   const chained = [];
   for (const name of HOOK_NAMES) {
     const file = path.join(dir, name);
-    if (fs.existsSync(file)) {
-      if (isOurShim(file, name)) continue;
+    const ours = readOurShim(file, name);
+    if (ours !== null && ours === shimBody(name)) continue;
+    if (ours === null && fs.existsSync(file)) {
       const local = `${file}.local`;
       if (fs.existsSync(local)) throw new Error(`${local} already exists; refusing to overwrite it`);
       fs.renameSync(file, local);

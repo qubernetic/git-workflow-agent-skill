@@ -154,6 +154,38 @@ test('installShims chains an existing hook once and never overwrites its own shi
   assert.deepEqual(second.written, []);
   assert.equal(fs.readFileSync(path.join(hooks, 'commit-msg.local'), 'utf8'), '#!/bin/sh\nexit 0\n');
   if (process.platform !== 'win32') assert.equal(fs.statSync(path.join(hooks, 'pre-push')).mode & 0o777, 0o755);
+  assert.equal(fs.readFileSync(path.join(hooks, 'pre-push'), 'utf8'), PRE_PUSH_SHIM);
+});
+
+const PRE_PUSH_SHIM = `#!/bin/sh\ninput=$(cat)\nlocal_hook="$(dirname "$0")/pre-push.local"\nif [ -x "$local_hook" ]; then printf '%s\\n' "$input" | "$local_hook" "$@" || exit $?; fi\nprintf '%s\\n' "$input" | node "${GUARD}" git pre-push "$@"\n`;
+const OLD_SHIM = (name) => `#!/bin/sh\n[ -x "$(dirname "$0")/${name}.local" ] && { "$(dirname "$0")/${name}.local" "$@" || exit $?; }\nexec node "${GUARD}" git ${name} "$@"\n`;
+
+test('installShims upgrades an old pre-push shim in place', () => {
+  const dir = makeRepo();
+  const hooks = path.join(dir, '.git', 'hooks');
+  fs.mkdirSync(hooks, { recursive: true });
+  fs.writeFileSync(path.join(hooks, 'pre-push'), OLD_SHIM('pre-push'), { mode: 0o755 });
+  const r = installShims(dir);
+  assert.deepEqual(r.chained, []);
+  assert.ok(r.written.includes('pre-push'));
+  assert.equal(fs.readFileSync(path.join(hooks, 'pre-push'), 'utf8'), PRE_PUSH_SHIM);
+  assert.equal(fs.existsSync(path.join(hooks, 'pre-push.local')), false);
+});
+
+test('a chained pre-push hook that reads stdin does not hide refs from the guard', { skip: process.platform === 'win32' }, () => {
+  const remote = path.join(tmp, `remote${n++}.git`);
+  spawnSync('git', ['init', '-q', '--bare', remote], { env: ENV });
+  const dir = makeRepo({ commits: 3 });
+  git(dir, 'remote', 'add', 'origin', remote);
+  const hooks = path.join(dir, '.git', 'hooks');
+  fs.mkdirSync(hooks, { recursive: true });
+  const seen = path.join(dir, 'seen.txt');
+  fs.writeFileSync(path.join(hooks, 'pre-push'), `#!/bin/sh\ncat > "${seen}"\n`, { mode: 0o755 });
+  installShims(dir);
+  const r = git(dir, 'push', 'origin', 'main');
+  assert.notEqual(r.status, 0);
+  assert.match(r.err, /protected-commit/);
+  assert.match(fs.readFileSync(seen, 'utf8'), /refs\/heads\/main/);
 });
 
 test('installShims honours core.hooksPath', () => {
