@@ -237,11 +237,27 @@ Branch deleted (remote + local)
 
 1. **Every branch starts from a GitHub Issue** — no branch without an issue, including releases (create a lightweight issue titled `chore(release): prepare 1.2.0` with `chore` label)
 2. **Issue title** follows Conventional Commits format without the `(#<issue>)` suffix — e.g., `fix(auth): login fails on expired token`
-3. **One PR per issue** — the PR closes exactly one issue (exception: an epic PR, which closes the epic and lists its slices — see [Epics](#epics))
+3. **One PR per issue** — the PR closes exactly one issue (exceptions: an epic PR, which closes the epic and lists its slices — see [Epics](#epics); a [small-issue bundle](#small-issue-bundles))
 4. **PR title** follows Conventional Commits format: `<type>(<scope>): <description> (#<issue>)` — e.g., `feat(auth): add OAuth2 login flow (#42)`
 5. **PR body** references the issue: `Closes #42`
 6. **Test plan verified before merge** — check off each item (`- [x]`) in the PR description as it passes. This makes test progress visible to reviewers and serves as an audit trail.
 7. **Branch is deleted** after merge — both remote (enable GitHub's "Automatically delete head branches") and local (`git fetch --prune && git branch -d <branch>`)
+
+### Small-Issue Bundles
+
+Two or three small, closely related issues may share one branch and one PR when all of these hold:
+
+- **Same area**: they belong to the same feature area or command group
+- **Small**: each is roughly 30 minutes of work or less
+- **Independent of other work**: no dependency on issues outside the bundle
+- **Reviewed together anyway**: none of them has value on its own that a separate review would protect
+
+If any issue could reasonably be reviewed on its own, keep it separate. More than three issues, or anything that is not small, is an [epic](#epics).
+
+- **Branch**: named after the lowest-numbered issue, with that issue's type: `feature/22-org-commands`
+- **Commits**: each issue gets its own atomic commit(s); never mix two issues in one commit
+- **PR title**: Conventional Commits with the branch's issue number: `feat(cli): add org, notification and completion commands (#22)`
+- **PR body**: one short section per issue saying what it contributes, then one `Closes #N` line per issue
 
 ### GitHub Auto-Close Limitation
 
@@ -735,6 +751,7 @@ Deliberate recovery on a shared branch (the force-push and secret-purge procedur
 | Preparing a release | `release/*` | `develop` |
 | Plan with two or more slices | `epic/*` | `develop` |
 | Slice of an open epic | `feature/*`, `fix/*`, `docs/*`, `ci/*` or `perf/*` | the epic branch |
+| Two or three small, related issues ([bundle](#small-issue-bundles)) | type of the lowest-numbered issue, named after it | `develop` |
 
 ### "What commit type do I use?"
 
