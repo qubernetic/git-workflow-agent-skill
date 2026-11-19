@@ -3,6 +3,7 @@
 import * as claude from './lib/adapters/claude.mjs';
 import * as codex from './lib/adapters/codex.mjs';
 import { commitMsg, prePush } from './lib/githooks.mjs';
+import * as manage from './lib/manage/commands.mjs';
 
 const ADAPTERS = { claude, codex };
 const EVENTS = { 'pre-tool-use': 'preToolUse', 'session-start': 'sessionStart' };
@@ -48,8 +49,31 @@ async function gitHook([name, ...args]) {
   }
 }
 
-// Later tasks add: install, update, doctor, repair, uninstall, enable, disable.
-const COMMANDS = { hook, git: gitHook };
+const flag = (args, name) => { const i = args.indexOf(name); return i === -1 ? undefined : args[i + 1]; };
+
+// Management commands print report lines; exit 1 on failure.
+const manageCmd = (fn) => async (args) => {
+  try {
+    for (const l of fn(args)) process.stdout.write(`${l}\n`);
+    return 0;
+  } catch (e) {
+    process.stderr.write(`git-workflow guard: ${e.message}\n`);
+    return 1;
+  }
+};
+
+// Later tasks add: update, doctor, repair.
+const COMMANDS = {
+  hook,
+  git: gitHook,
+  install: manageCmd((a) => manage.install({
+    scope: flag(a, '--scope') ?? 'opt-in',
+    harnesses: flag(a, '--harness')?.split(',').filter(Boolean),
+  })),
+  uninstall: manageCmd(() => manage.uninstall()),
+  enable: manageCmd((a) => manage.enable({ gitHooks: a.includes('--git-hooks') })),
+  disable: manageCmd(() => manage.disable()),
+};
 
 const [sub, ...rest] = process.argv.slice(2);
 if (!COMMANDS[sub]) {
