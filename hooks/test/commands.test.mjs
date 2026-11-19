@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import { parseCommandLine } from '../lib/shell.mjs';
 import { recognise } from '../lib/commands.mjs';
 
@@ -57,7 +58,7 @@ test('git commit -F reads via readFile, relative to cwd', () => {
   const seen = [];
   const a = rec('git commit -F msg.txt', (p) => { seen.push(p); return 'chore: z'; }, { cwd: '/w' });
   assert.equal(a.texts.message, 'chore: z');
-  assert.deepEqual(seen, ['/w/msg.txt']);
+  assert.deepEqual(seen, [path.join('/w', 'msg.txt')]);
   assert.equal(a.flags.get('file'), 'msg.txt');
 });
 
