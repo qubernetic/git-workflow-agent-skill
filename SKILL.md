@@ -231,11 +231,12 @@ Branch deleted (remote + local)
 ### Rules
 
 1. **Every branch starts from a GitHub Issue** — no branch without an issue, including releases (create a lightweight issue titled `chore(release): prepare 1.2.0` with `chore` label)
-2. **One PR per issue** — the PR closes exactly one issue (exception: an epic PR, which closes the epic and lists its slices — see [Epics](#epics))
-3. **PR title** follows Conventional Commits format: `<type>(<scope>): <description> (#<issue>)` — e.g., `feat(auth): add OAuth2 login flow (#42)`
-4. **PR body** references the issue: `Closes #42`
-5. **Test plan verified before merge** — check off each item (`- [x]`) in the PR description as it passes. This makes test progress visible to reviewers and serves as an audit trail.
-6. **Branch is deleted** after merge — both remote (enable GitHub's "Automatically delete head branches") and local (`git fetch --prune && git branch -d <branch>`)
+2. **Issue title** follows Conventional Commits format without the `(#<issue>)` suffix — e.g., `fix(auth): login fails on expired token`
+3. **One PR per issue** — the PR closes exactly one issue (exception: an epic PR, which closes the epic and lists its slices — see [Epics](#epics))
+4. **PR title** follows Conventional Commits format: `<type>(<scope>): <description> (#<issue>)` — e.g., `feat(auth): add OAuth2 login flow (#42)`
+5. **PR body** references the issue: `Closes #42`
+6. **Test plan verified before merge** — check off each item (`- [x]`) in the PR description as it passes. This makes test progress visible to reviewers and serves as an audit trail.
+7. **Branch is deleted** after merge — both remote (enable GitHub's "Automatically delete head branches") and local (`git fetch --prune && git branch -d <branch>`)
 
 ### GitHub Auto-Close Limitation
 
@@ -694,9 +695,11 @@ What the guard checks (rule id: meaning):
 
 Per repository, `.git-workflow.json` can change `protectedBranches`, `branchTypes`, `attributionPatterns` and per-rule levels (`"rules": {"<rule-id>": "on|off|warn|ask|deny"}`). The guard fails open: if it cannot parse or query something, it allows and prints a warning.
 
+Deliberate recovery on a shared branch (the force-push and secret-purge procedures under [Troubleshooting](#troubleshooting)) is denied by `force-push`; a human sets `"rules": {"force-push": "off"}` in `.git-workflow.json` for the duration and restores it afterwards.
+
 ### Guard commands
 
-`<guard>` is `hooks/guard.mjs` next to the real path of this SKILL.md (resolve the symlink: `realpath SKILL.md` on Linux/macOS, `(Get-Item SKILL.md).Target` on Windows), or `guardPath` from the user config (`$XDG_CONFIG_HOME/git-workflow-guard/config.json`, on Windows `%APPDATA%\git-workflow-guard\config.json`) once installed.
+`<guard>` is `hooks/guard.mjs` next to the real path of this SKILL.md (resolve the symlink from the skill's base directory, not the project: `realpath ~/.claude/skills/git-workflow/SKILL.md` on Linux/macOS, `(Get-Item "$env:USERPROFILE\.claude\skills\git-workflow\SKILL.md").Target` on Windows; use the actual skill directory if installed elsewhere), or `guardPath` from the user config (`$XDG_CONFIG_HOME/git-workflow-guard/config.json`, on Windows `%APPDATA%\git-workflow-guard\config.json`) once installed.
 
 `/git-workflow guard <command>` and plain requests ("install the guard", "is the guard working?") both map to:
 
@@ -708,7 +711,7 @@ Per repository, `.git-workflow.json` can change `protectedBranches`, `branchType
 | Fix a broken or missing registration | `node "<guard>" repair` |
 | Remove the agent hooks | `node "<guard>" uninstall` |
 | Turn the guard on in this repository (`--git-hooks` also installs the git hooks) | `node "<guard>" enable` |
-| Turn the guard off in this repository | `node "<guard>" disable` |
+| Turn the guard off in this repository (removes an empty `.git-workflow.json`, which is enough with opt-in scope; with scope `all` or custom settings, set the rules to `off` instead) | `node "<guard>" disable` |
 
 ---
 
