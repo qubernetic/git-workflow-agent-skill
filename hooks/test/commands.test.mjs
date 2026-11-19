@@ -11,10 +11,10 @@ const rec = (src, readFile, opts) => {
 };
 
 test('git -C/-c globals fold into cwd, combined -am split', () => {
-  const a = rec('git -C /r -c x=y commit -am "fix: y"');
+  const a = rec('git -C /repo -c x=y commit -am "fix: y"');
   assert.equal(a.tool, 'git');
   assert.equal(a.sub, 'commit');
-  assert.equal(a.cwd, '/r');
+  assert.equal(a.cwd, '/repo');
   assert.equal(a.texts.message, 'fix: y');
   assert.equal(a.flags.get('all'), true);
   assert.equal(a.flags.get('message'), 'fix: y');
@@ -228,4 +228,16 @@ test('-F/--body-file read only regular files up to 1 MiB', async () => {
   if (process.platform !== 'win32' && spawnSync('mkfifo', [path.join(dir, 'fifo')]).status === 0) {
     assert.equal(rec('git commit -F fifo', undefined, { cwd: dir }).texts.message, undefined);
   }
+});
+
+test('git -C and -F with Git Bash drive paths map to the drive on win32 only', () => {
+  const seen = [];
+  const read = (p) => { seen.push(p); return 'chore: z'; };
+  const cmd = parseCommandLine('git -C /d/w commit -F msg.txt').commands[0];
+  assert.equal(recognise(cmd, read, { platform: 'win32' }).cwd, 'D:/w');
+  assert.equal(recognise(cmd, read, { platform: 'linux' }).cwd, '/d/w');
+  assert.deepEqual(seen, ['D:\\w\\msg.txt', '/d/w/msg.txt']);
+  const abs = parseCommandLine('git commit -F /C/m.txt', { cwd: '/w' }).commands[0];
+  recognise(abs, read, { platform: 'win32' });
+  assert.equal(seen.at(-1), 'C:/m.txt');
 });

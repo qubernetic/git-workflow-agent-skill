@@ -166,3 +166,12 @@ test('relative cd from unknown base stays unknown', () => {
   const r = parseCommandLine("cd '' ; cd sub; git status", { cwd: '/w' });
   assert.equal(r.commands.find((c) => c.argv[0] === 'git').cwd, undefined);
 });
+
+test('cd to a Git Bash drive path maps to the drive on win32 only', () => {
+  const w = parseCommandLine('cd /c/Users/x && git status; cd /D && git log; cd /tmp/y && git log', { cwd: 'C:\\r', platform: 'win32' });
+  assert.equal(w.commands[1].cwd, 'C:/Users/x');
+  assert.equal(w.commands[3].cwd, 'D:/');
+  assert.equal(w.commands[5].cwd, '/tmp/y');
+  const l = parseCommandLine('cd /c/Users/x && git status', { cwd: '/r', platform: 'linux' });
+  assert.equal(l.commands[1].cwd, '/c/Users/x');
+});

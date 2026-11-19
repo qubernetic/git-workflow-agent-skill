@@ -1,5 +1,5 @@
 // Check pipeline: command line -> actions -> rule findings -> decision.
-// runCheck({command, cwd, askSupported, env?, exec?}) -> {decision, reason, warnings}
+// runCheck({command, cwd, askSupported, env?, exec?, platform?}) -> {decision, reason, warnings}
 import { parseCommandLine } from './shell.mjs';
 import { recognise } from './commands.mjs';
 import { loadConfig } from './config.mjs';
@@ -7,6 +7,7 @@ import { createState } from './state.mjs';
 import { evaluate } from './rules/index.mjs';
 import { attributionFinding } from './rules/text.mjs';
 import { withLevel } from './rules/levels.mjs';
+import { fromGitBash } from './paths.mjs';
 
 const GIT_OR_GH = /\b(git|gh)\b/;
 const MAX_DEPTH = 3;
@@ -20,7 +21,7 @@ const base = (s) => String(s ?? '').replace(/^.*[\\/]/, '').replace(/\.exe$/i, '
 
 // Strips one wrapper layer. Returns {argv, env, cwd} for the wrapped command,
 // {script} for `<shell> -c <script>`, or null when argv is not a wrapper.
-function unwrapOnce(cmd) {
+function unwrapOnce(cmd, platform) {
   const { argv } = cmd;
   const name = base(argv[0]);
   let env = cmd.env ?? {};
@@ -31,7 +32,7 @@ function unwrapOnce(cmd) {
       const a = argv[i];
       if (ENV_ASSIGN.test(a)) { const eq = a.indexOf('='); env = { ...env, [a.slice(0, eq)]: a.slice(eq + 1) }; i += 1; }
       else if (a === '-u' || a === '--unset') i += 2;
-      else if ((a === '-C' || a === '--chdir') && i + 1 < argv.length) { cwd = resolveFrom(cwd, argv[i + 1]); i += 2; }
+      else if ((a === '-C' || a === '--chdir') && i + 1 < argv.length) { cwd = resolveFrom(cwd, argv[i + 1], platform); i += 2; }
       else if (a.startsWith('-') && a !== '-' && a !== '--') i += 1;
       else if (a === '--') { i += 1; break; }
       else break;
@@ -79,24 +80,25 @@ function unwrapOnce(cmd) {
   return rest.length ? { argv: rest, env, cwd } : null;
 }
 
-function resolveFrom(base0, dir) {
+function resolveFrom(base0, raw, platform) {
+  const dir = fromGitBash(raw, platform);
   if (!base0 || /^([/\\]|[A-Za-z]:)/.test(dir)) return dir;
   return `${base0.replace(/[/\\]$/, '')}/${dir}`;
 }
 
 // Expands wrappers recursively; returns {leaves: SimpleCommand[], failedScripts: string[]}.
-function expand(cmd, depth, out) {
-  const w = cmd.argv?.length ? unwrapOnce(cmd) : null;
+function expand(cmd, depth, out, platform) {
+  const w = cmd.argv?.length ? unwrapOnce(cmd, platform) : null;
   if (!w) { out.leaves.push(cmd); return; }
   if (w.script !== undefined) {
     if (depth >= MAX_DEPTH) { out.failedScripts.push(w.script); return; }
-    const inner = parseCommandLine(w.script, { cwd: w.cwd });
+    const inner = parseCommandLine(w.script, { cwd: w.cwd, platform });
     if (!inner.ok) { out.failedScripts.push(w.script); return; }
-    for (const c of inner.commands) expand({ ...c, env: { ...w.env, ...c.env } }, depth + 1, out);
+    for (const c of inner.commands) expand({ ...c, env: { ...w.env, ...c.env } }, depth + 1, out, platform);
     return;
   }
   if (depth >= MAX_DEPTH) { out.leaves.push(cmd); return; }
-  expand({ ...cmd, argv: w.argv, env: w.env, cwd: w.cwd }, depth + 1, out);
+  expand({ ...cmd, argv: w.argv, env: w.env, cwd: w.cwd }, depth + 1, out, platform);
 }
 
 const MERGE_FALLBACK = /gh\s+pr\s+merge\b[^\n]*--(squash|rebase|admin)\b/;
@@ -120,7 +122,7 @@ function rawFallback(text, config, askSupported) {
   return found.map((f) => withLevel(f, config, askSupported)).filter(Boolean);
 }
 
-export async function runCheck({ command, cwd, askSupported = false, env, exec } = {}) {
+export async function runCheck({ command, cwd, askSupported = false, env, exec, platform = process.platform } = {}) {
   const warnings = [];
   try {
     if (!GIT_OR_GH.test(String(command ?? ''))) return { decision: 'allow', reason: '', warnings };
@@ -130,17 +132,17 @@ export async function runCheck({ command, cwd, askSupported = false, env, exec }
     if (!config.active) return { decision: 'allow', reason: '', warnings };
 
     let findings = [];
-    const parsed = parseCommandLine(command, { cwd });
+    const parsed = parseCommandLine(command, { cwd, platform });
     if (!parsed.ok) {
       findings = rawFallback(command, config, askSupported);
       warnings.push('could not parse the command line; only plain-text checks ran');
     } else {
       const out = { leaves: [], failedScripts: [] };
-      for (const c of parsed.commands) expand(c, 0, out);
+      for (const c of parsed.commands) expand(c, 0, out, platform);
       for (const s of out.failedScripts) findings.push(...rawFallback(s, config, askSupported));
       const groups = new Map();
       for (const leaf of out.leaves) {
-        const action = recognise(leaf);
+        const action = recognise(leaf, undefined, { platform });
         if (!action) continue;
         const key = action.cwd ?? cwd;
         if (!groups.has(key)) groups.set(key, []);

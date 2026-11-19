@@ -1,6 +1,6 @@
 // Minimal, non-executing shell command-line tokenizer.
-// parseCommandLine(src, {cwd}) -> {ok, commands: [{argv, env, cwd, stdin, raw}]}
-import path from 'node:path';
+// parseCommandLine(src, {cwd, platform?}) -> {ok, commands: [{argv, env, cwd, stdin, raw}]}
+import { pathApi, fromGitBash } from './paths.mjs';
 
 class ParseError extends Error {}
 
@@ -10,17 +10,19 @@ const ENV_RE = /^[A-Za-z_][A-Za-z0-9_]*=/;
 
 export function parseCommandLine(src, opts = {}) {
   try {
-    return { ok: true, commands: parseScript(String(src), opts.cwd) };
+    return { ok: true, commands: parseScript(String(src), opts.cwd, opts.platform ?? process.platform) };
   } catch (e) {
     if (e instanceof ParseError) return { ok: false, commands: [] };
     throw e;
   }
 }
 
-function resolveCwd(base, target) {
-  if (path.isAbsolute(target)) return target;
+function resolveCwd(base, target, platform) {
+  const p = pathApi(platform);
+  const dir = fromGitBash(target, platform);
+  if (p.isAbsolute(dir)) return dir;
   if (!base) return undefined;
-  return path.resolve(base, target);
+  return p.resolve(base, dir);
 }
 
 // Index of the ')' matching an already-consumed '(' (depth 1 at `from`).
@@ -95,7 +97,7 @@ function findSubstEnd(src, from) {
   throw new ParseError('unterminated substitution');
 }
 
-function parseScript(src, startCwd) {
+function parseScript(src, startCwd, platform) {
   const n = src.length;
   const commands = [];
   const pending = [];
@@ -123,7 +125,7 @@ function parseScript(src, startCwd) {
       cur.raw = src.slice(curStart, end).trim();
       commands.push(cur);
       if (!isLocal && cur.argv[0] === 'cd' && cur.argv.length > 1 && cur.argv[1] !== '-') {
-        cwd = cur.argv[1] === '' ? undefined : resolveCwd(cwd, cur.argv[1]);
+        cwd = cur.argv[1] === '' ? undefined : resolveCwd(cwd, cur.argv[1], platform);
       }
     }
     cur = null;
@@ -131,7 +133,7 @@ function parseScript(src, startCwd) {
   };
 
   const substValue = (inner) => {
-    const sub = parseScript(inner, cwd);
+    const sub = parseScript(inner, cwd, platform);
     commands.push(...sub);
     const first = sub[0];
     if (first && first.argv[0] === 'cat' && first.stdin !== undefined) {

@@ -138,6 +138,15 @@ test('one state per distinct action cwd', async () => {
   assert.ok(cwds.has(repo) && cwds.has(other), [...cwds].join());
 });
 
+test('Git Bash drive paths in cd and env -C set the action cwd on win32 only', async () => {
+  for (const [platform, want] of [['win32', ['C:/work/a', 'D:/b']], ['linux', ['/c/work/a', '/d/b']]]) {
+    const exec = spy();
+    await run('cd /c/work/a && git commit -m "bad subject"; env -C /d/b git commit -m "bad subject"', { exec, platform });
+    const cwds = new Set(exec.calls.map((c) => c[2]));
+    for (const w of want) assert.ok(cwds.has(w), `${platform}: ${[...cwds].join()}`);
+  }
+});
+
 test('warn findings become warnings, ask decision passes through', async () => {
   fs.writeFileSync(path.join(repo, '.git-workflow.json'), JSON.stringify({ rules: { 'merge-method': 'warn' } }));
   const r = await run('gh pr merge 3 --squash');

@@ -1,6 +1,6 @@
 // Recognise git / gh invocations in a SimpleCommand and normalise them.
 //
-// recognise(cmd, readFile?) -> Action | null
+// recognise(cmd, readFile?, {platform?}) -> Action | null
 //   Action = {tool, sub, flags, positionals, env, cwd, texts: {message?, title?, body?}, raw}
 //
 // Flag convention (flags: Map<string, string|true>):
@@ -25,7 +25,7 @@
 //   git commit --trailer values are appended to texts.message (texts.trailers without a message).
 // Git global options (-C <dir>, -c k=v, --no-pager, -P, ...) are skipped; -C folds into cwd.
 import { readFileSync, statSync } from 'node:fs';
-import { isAbsolute, join } from 'node:path';
+import { pathApi, fromGitBash } from './paths.mjs';
 
 const GH_TEXT = { t: 'title', b: 'body', B: 'base', H: 'head', F: 'body-file', R: 'repo' };
 const ALIASES = {
@@ -88,17 +88,18 @@ function defaultReadFile(p) {
   } catch { return null; }
 }
 
-function resolveDir(dir, cwd) {
-  if (isAbsolute(dir) || /^[~]/.test(dir) || !cwd) return dir;
-  return join(cwd, dir);
+function resolveDir(raw, cwd, platform) {
+  const dir = fromGitBash(raw, platform);
+  if (pathApi(platform).isAbsolute(dir) || /^[~]/.test(dir) || !cwd) return dir;
+  return pathApi(platform).join(cwd, dir);
 }
 
 // Skips git global options (any --long[=v], -p, -P, -C, -c); the first other word is the subcommand. Returns {i: index of subcommand, cwd}.
-function skipGitGlobals(argv, cwd) {
+function skipGitGlobals(argv, cwd, platform) {
   let i = 1;
   while (i < argv.length) {
     const a = argv[i];
-    if (a === '-C' && i + 1 < argv.length) { cwd = resolveDir(argv[i + 1], cwd); i += 2; }
+    if (a === '-C' && i + 1 < argv.length) { cwd = resolveDir(argv[i + 1], cwd, platform); i += 2; }
     else if (a === '-c' && i + 1 < argv.length) i += 2;
     else if (GIT_GLOBAL_VALUE.has(a)) i += 2;
     else if (a.startsWith('--') && a.length > 2) i += 1;
@@ -167,7 +168,7 @@ function parseArgs(args, key) {
   return { flags, positionals };
 }
 
-export function recognise(cmd, readFile = defaultReadFile) {
+export function recognise(cmd, readFile = defaultReadFile, { platform = process.platform } = {}) {
   const argv = cmd?.argv;
   if (!argv || argv.length === 0) return null;
   const tool = base(argv[0]);
@@ -176,7 +177,7 @@ export function recognise(cmd, readFile = defaultReadFile) {
   let rest;
   let ghRepo;
   if (tool === 'git') {
-    const g = skipGitGlobals(argv, cwd);
+    const g = skipGitGlobals(argv, cwd, platform);
     cwd = g.cwd;
     if (!GIT_SUBS.has(argv[g.i])) return null;
     sub = argv[g.i];
@@ -193,7 +194,7 @@ export function recognise(cmd, readFile = defaultReadFile) {
   if (ghRepo !== undefined && !flags.has('repo')) flags.set('repo', ghRepo);
   const fileText = (p) => {
     if (p === '-') return cmd.stdin ?? null;
-    return readFile(resolveDir(p, cwd));
+    return readFile(resolveDir(p, cwd, platform));
   };
 
   const texts = {};
