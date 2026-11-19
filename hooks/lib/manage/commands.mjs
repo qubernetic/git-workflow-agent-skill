@@ -283,7 +283,7 @@ export async function update({ env = process.env, exec = defaultExec, skillDir =
   const top = await git('rev-parse', '--show-toplevel');
   if (top.code !== 0) return manual;
   let same = false;
-  try { same = fs.realpathSync(top.stdout.trim()) === fs.realpathSync(skillDir); } catch { /* fall through */ }
+  try { same = fs.realpathSync.native(top.stdout.trim()) === fs.realpathSync.native(skillDir); } catch { /* fall through */ }
   if (!same) return manual;
   const dirty = await git('status', '--porcelain', '--untracked-files=no');
   if (dirty.code !== 0) throw new Error(`git status failed: ${dirty.stderr.trim()}`);
