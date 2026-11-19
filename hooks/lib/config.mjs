@@ -11,8 +11,8 @@ export function userConfigPath(env = process.env, platform = process.platform) {
     const base = env.APPDATA || path.win32.join(env.USERPROFILE || os.homedir(), 'AppData', 'Roaming');
     return path.win32.join(base, 'git-workflow-guard', 'config.json');
   }
-  const base = env.XDG_CONFIG_HOME || path.join(env.HOME || os.homedir(), '.config');
-  return path.join(base, 'git-workflow-guard', 'config.json');
+  const base = env.XDG_CONFIG_HOME || path.posix.join(env.HOME || os.homedir(), '.config');
+  return path.posix.join(base, 'git-workflow-guard', 'config.json');
 }
 
 export function findRepoRoot(cwd) {
