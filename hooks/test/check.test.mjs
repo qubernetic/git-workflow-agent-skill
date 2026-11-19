@@ -97,6 +97,30 @@ test('wrappers are unwrapped: env, sudo, bash -c, nested', async () => {
   assert.equal((await run(`bash -c 'gh pr merge 3 --merge'`)).decision, 'allow');
 });
 
+test('timeout, xargs and eval wrappers are unwrapped', async () => {
+  for (const cmd of [
+    'timeout 60 gh pr merge 5 --squash',
+    'timeout -s KILL -k 5 --preserve-status 1m gh pr merge 5 --squash',
+    'timeout --signal=TERM 60 gh pr merge 5 --squash',
+    'xargs -I{} gh pr merge {} --squash <<< 5',
+    'xargs -I {} gh pr merge {} --squash <<< 5',
+    'echo 5 | xargs -n 1 -P 2 -r gh pr merge --squash',
+    'xargs -0 -d , -L 1 -s 100 -E x -a f gh pr merge --squash',
+    'eval "gh pr merge 5 --squash"',
+    `eval gh pr merge 5 '--squash'`,
+    'timeout 5 eval "env A=1 gh pr merge 5 --squash"',
+  ]) {
+    const r = await run(cmd);
+    assert.equal(r.decision, 'deny', cmd);
+    assert.match(r.reason, /merge-method/, cmd);
+  }
+  const forced = await run('eval "git push --force origin feature/1-x"');
+  assert.match(forced.reason, /force-push/);
+  assert.equal((await run('timeout 60 gh pr merge 5 --merge', { exec: spy() })).decision, 'allow');
+  assert.equal((await run('timeout 60')).decision, 'allow');
+  assert.equal((await run('xargs echo git')).decision, 'allow');
+});
+
 test('one state per distinct action cwd', async () => {
   const other = path.join(tmp, 'other');
   const exec = spy();

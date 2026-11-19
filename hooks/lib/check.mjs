@@ -14,6 +14,8 @@ const RANK = { allow: 0, warn: 1, ask: 2, deny: 3 };
 const SHELLS = new Set(['bash', 'sh', 'zsh']);
 const ENV_ASSIGN = /^[A-Za-z_][A-Za-z0-9_]*=/;
 const SUDO_VALUE_FLAGS = new Set(['-u', '-g', '-h', '-p', '-C', '-D', '-R', '-T', '-U', '-r', '-t']);
+const XARGS_SHORT_VALUE = new Set(['n', 'I', 'L', 'P', 'd', 's', 'E', 'a']);
+const XARGS_LONG_VALUE = new Set(['--arg-file', '--delimiter', '--max-args', '--max-procs', '--max-chars', '--process-slot-var']);
 const base = (s) => String(s ?? '').replace(/^.*[\\/]/, '').replace(/\.exe$/i, '');
 
 // Strips one wrapper layer. Returns {argv, env, cwd} for the wrapped command,
@@ -43,6 +45,28 @@ function unwrapOnce(cmd) {
   } else if (name === 'nice') {
     while (i < argv.length && argv[i].startsWith('-') && argv[i] !== '--') i += argv[i] === '-n' ? 2 : 1;
     if (argv[i] === '--') i += 1;
+  } else if (name === 'timeout') {
+    // timeout [-s SIG] [-k DUR] [--opt[=v]] DURATION command...
+    while (i < argv.length && argv[i].startsWith('-') && argv[i] !== '--' && argv[i] !== '-') {
+      const a = argv[i];
+      i += (a === '-s' || a === '-k' || a === '--signal' || a === '--kill-after') ? 2 : 1;
+    }
+    if (argv[i] === '--') i += 1;
+    i += 1; // DURATION
+  } else if (name === 'xargs') {
+    // With -I the rest is the command template; {} stays a positional.
+    while (i < argv.length && argv[i].startsWith('-') && argv[i] !== '--' && argv[i] !== '-') {
+      const a = argv[i];
+      if (a.startsWith('--')) { i += XARGS_LONG_VALUE.has(a) ? 2 : 1; continue; }
+      let step = 1;
+      for (let j = 1; j < a.length; j++) {
+        if (XARGS_SHORT_VALUE.has(a[j])) { if (j === a.length - 1) step = 2; break; }
+      }
+      i += step;
+    }
+    if (argv[i] === '--') i += 1;
+  } else if (name === 'eval') {
+    return argv.length > 1 ? { script: argv.slice(1).join(' '), env, cwd } : null;
   } else if (SHELLS.has(name)) {
     for (let j = 1; j < argv.length; j++) {
       const a = argv[j];
