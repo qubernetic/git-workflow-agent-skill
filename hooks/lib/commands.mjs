@@ -1,0 +1,178 @@
+// Recognise git / gh invocations in a SimpleCommand and normalise them.
+//
+// recognise(cmd, readFile?) -> Action | null
+//   Action = {tool, sub, flags, positionals, env, cwd, texts: {message?, title?, body?}, raw}
+//
+// Flag convention (flags: Map<string, string|true>):
+//   - keys carry no leading dashes: `--squash` and `-s` both give key `squash`.
+//   - a flag that takes a value maps to that value (`-m msg` -> message: 'msg'),
+//     any other flag maps to `true`; `--flag=value` is accepted.
+//   - repeated `message` values are joined with a blank line; for other flags the last wins.
+//   - short aliases are folded to the long name ONLY for the (tool, sub) pairs below;
+//     every other short flag keeps its single-letter key (e.g. `switch -c`, `checkout -b`,
+//     `worktree add -b`, `gh pr create -m` is a milestone and stays `m`).
+//   Alias table:
+//     gh pr merge   : -s squash, -r rebase, -m merge, -d delete-branch,
+//                     -t title, -b body, -B base, -H head, -F body-file
+//     gh pr create/edit, gh issue create/edit:
+//                     -t title, -b body, -B base, -H head, -F body-file
+//     git commit    : -m message, -F file, -n no-verify, -a all
+//     git push      : -f force, -d delete, -u set-upstream
+//     git tag       : -m message, -F file
+//   Combined short flags (`-am msg`, `-fu`) are split; a value flag takes the rest of the
+//   cluster or the next argument.
+// Git global options (-C <dir>, -c k=v, --no-pager, -P, ...) are skipped; -C folds into cwd.
+import { readFileSync } from 'node:fs';
+import { isAbsolute, join } from 'node:path';
+
+const GH_TEXT = { t: 'title', b: 'body', B: 'base', H: 'head', F: 'body-file' };
+const ALIASES = {
+  'git commit': { m: 'message', F: 'file', n: 'no-verify', a: 'all' },
+  'git tag': { m: 'message', F: 'file' },
+  'git push': { f: 'force', d: 'delete', u: 'set-upstream' },
+  'gh pr merge': { s: 'squash', r: 'rebase', m: 'merge', d: 'delete-branch', ...GH_TEXT },
+  'gh pr create': GH_TEXT,
+  'gh pr edit': GH_TEXT,
+  'gh issue create': GH_TEXT,
+  'gh issue edit': GH_TEXT,
+};
+
+// Canonical flag names (post-alias) that consume a value, per sub.
+const gh = ['title', 'body', 'body-file', 'base', 'head', 'repo', 'R', 'a', 'assignee', 'l', 'label',
+  'm', 'milestone', 'p', 'project', 'r', 'reviewer', 'T', 'template', 'add-label', 'remove-label',
+  'add-assignee', 'remove-assignee', 'add-reviewer', 'remove-reviewer', 'add-project',
+  'remove-project', 'remove-milestone'];
+const VALUE_FLAGS = {
+  'git commit': ['message', 'file', 'C', 'c', 'reuse-message', 'reedit-message', 'author', 'date',
+    'cleanup', 'template', 't', 'fixup', 'squash'],
+  'git push': ['o', 'push-option', 'repo', 'receive-pack', 'exec'],
+  'git checkout': ['b', 'B', 'orphan', 'conflict', 'pathspec-from-file'],
+  'git switch': ['c', 'C', 'create', 'force-create', 'orphan', 'conflict'],
+  'git branch': ['u', 'set-upstream-to', 'contains', 'no-contains', 'merged', 'no-merged',
+    'points-at', 'sort', 'format'],
+  'git worktree': ['b', 'B', 'reason'],
+  'git tag': ['m', 'message', 'F', 'file', 'u', 'local-user', 'contains', 'no-contains', 'merged',
+    'no-merged', 'points-at', 'sort', 'format'],
+  'gh pr merge': ['title', 'body', 'body-file', 'A', 'author-email', 'match-head-commit', 'repo', 'R'],
+  'gh pr create': gh,
+  'gh pr edit': gh,
+  'gh issue create': gh,
+  'gh issue edit': gh,
+};
+
+const GIT_SUBS = new Set(['commit', 'push', 'checkout', 'switch', 'branch', 'worktree', 'tag']);
+const GH_SUBS = {
+  pr: new Set(['create', 'edit', 'merge']),
+  issue: new Set(['create', 'edit']),
+};
+// Git global options that consume a separate value argument (besides -C/-c handled below).
+const GIT_GLOBAL_VALUE = new Set(['--git-dir', '--work-tree', '--namespace', '--exec-path']);
+
+const base = (s) => String(s ?? '').replace(/^.*[\\/]/, '').replace(/\.exe$/i, '');
+
+function defaultReadFile(p) {
+  try { return readFileSync(p, 'utf8'); } catch { return null; }
+}
+
+function resolveDir(dir, cwd) {
+  if (isAbsolute(dir) || /^[~]/.test(dir) || !cwd) return dir;
+  return join(cwd, dir);
+}
+
+// Skips git global options; returns {i: index of subcommand, cwd}.
+function skipGitGlobals(argv, cwd) {
+  let i = 1;
+  while (i < argv.length) {
+    const a = argv[i];
+    if (a === '-C' && i + 1 < argv.length) { cwd = resolveDir(argv[i + 1], cwd); i += 2; }
+    else if (a === '-c' && i + 1 < argv.length) i += 2;
+    else if (GIT_GLOBAL_VALUE.has(a)) i += 2;
+    else if (a.startsWith('--') && a.includes('=') && GIT_GLOBAL_VALUE.has(a.split('=')[0])) i += 1;
+    else if (a === '--no-pager' || a === '-P' || a === '-p' || a === '--paginate'
+      || a === '--no-optional-locks' || a === '--bare' || a === '--no-replace-objects') i += 1;
+    else break;
+  }
+  return { i, cwd };
+}
+
+function parseArgs(args, key) {
+  const aliases = ALIASES[key] ?? {};
+  const valueFlags = new Set(VALUE_FLAGS[key] ?? []);
+  const flags = new Map();
+  const positionals = [];
+  const set = (name, val) => {
+    if (name === 'message' && typeof val === 'string' && typeof flags.get(name) === 'string') {
+      flags.set(name, `${flags.get(name)}\n\n${val}`);
+    } else flags.set(name, val);
+  };
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === '--') { positionals.push(...args.slice(i + 1)); break; }
+    if (a.startsWith('--') && a.length > 2) {
+      const eq = a.indexOf('=');
+      const name = eq === -1 ? a.slice(2) : a.slice(2, eq);
+      if (eq !== -1) set(name, a.slice(eq + 1));
+      else if (valueFlags.has(name) && i + 1 < args.length) set(name, args[++i]);
+      else set(name, true);
+    } else if (a.startsWith('-') && a.length > 1) {
+      for (let j = 1; j < a.length; j++) {
+        const name = aliases[a[j]] ?? a[j];
+        if (valueFlags.has(name)) {
+          const rest = a.slice(j + 1);
+          if (rest) set(name, rest);
+          else if (i + 1 < args.length) set(name, args[++i]);
+          else set(name, true);
+          break;
+        }
+        set(name, true);
+      }
+    } else positionals.push(a);
+  }
+  return { flags, positionals };
+}
+
+export function recognise(cmd, readFile = defaultReadFile) {
+  const argv = cmd?.argv;
+  if (!argv || argv.length === 0) return null;
+  const tool = base(argv[0]);
+  let cwd = cmd.cwd;
+  let sub;
+  let rest;
+  if (tool === 'git') {
+    const g = skipGitGlobals(argv, cwd);
+    cwd = g.cwd;
+    if (!GIT_SUBS.has(argv[g.i])) return null;
+    sub = argv[g.i];
+    rest = argv.slice(g.i + 1);
+  } else if (tool === 'gh') {
+    if (!GH_SUBS[argv[1]]?.has(argv[2])) return null;
+    sub = `${argv[1]} ${argv[2]}`;
+    rest = argv.slice(3);
+  } else return null;
+
+  const { flags, positionals } = parseArgs(rest, `${tool} ${sub}`);
+  const fileText = (p) => {
+    if (p === '-') return cmd.stdin ?? null;
+    return readFile(resolveDir(p, cwd));
+  };
+
+  const texts = {};
+  if (tool === 'git' && sub === 'commit') {
+    const parts = [];
+    if (typeof flags.get('message') === 'string') parts.push(flags.get('message'));
+    if (typeof flags.get('file') === 'string') {
+      const t = fileText(flags.get('file'));
+      if (t != null) parts.push(t);
+    }
+    if (parts.length) texts.message = parts.join('\n\n');
+  } else if (tool === 'gh' && /create|edit/.test(sub)) {
+    if (typeof flags.get('title') === 'string') texts.title = flags.get('title');
+    if (typeof flags.get('body') === 'string') texts.body = flags.get('body');
+    else if (typeof flags.get('body-file') === 'string') {
+      const t = fileText(flags.get('body-file'));
+      if (t != null) texts.body = t;
+    }
+  }
+
+  return { tool, sub, flags, positionals, env: cmd.env ?? {}, cwd, texts, raw: cmd.raw };
+}
