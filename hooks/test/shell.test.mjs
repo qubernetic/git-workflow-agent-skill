@@ -119,3 +119,33 @@ test('unterminated quote is not ok', () => {
   assert.equal(parseCommandLine("git commit -m 'oops").ok, false);
   assert.equal(parseCommandLine('echo $(git status').ok, false);
 });
+
+test('subshell cd does not leak cwd', () => {
+  const r = parseCommandLine('(cd sub && git status); git push', { cwd: '/w' });
+  assert.equal(r.commands.find((c) => c.argv[1] === 'status').cwd, '/w/sub');
+  assert.equal(r.commands.find((c) => c.argv[1] === 'push').cwd, '/w');
+  const r2 = parseCommandLine('(cd /x && git status); git push');
+  assert.equal(r2.commands.find((c) => c.argv[1] === 'push').cwd, undefined);
+});
+
+test('shell keywords at command position are skipped', () => {
+  let r = parseCommandLine('if true; then git push; fi');
+  assert.ok(r.commands.some((c) => c.argv.join(' ') === 'git push'));
+  assert.ok(!r.commands.some((c) => ['fi', 'then'].includes(c.argv[0])));
+  r = parseCommandLine('for b in a; do git branch -D $b; done');
+  assert.ok(r.commands.some((c) => c.argv[0] === 'git' && c.argv[1] === 'branch' && c.argv[2] === '-D'));
+  assert.ok(!r.commands.some((c) => c.argv[0] === 'done'));
+  r = parseCommandLine('! git diff --quiet');
+  assert.deepEqual(r.commands[0].argv, ['git', 'diff', '--quiet']);
+  r = parseCommandLine('time -p git push');
+  assert.deepEqual(r.commands[0].argv, ['git', 'push']);
+  r = parseCommandLine('{ git push; }');
+  assert.deepEqual(r.commands.map((c) => c.argv), [['git', 'push']]);
+});
+
+test('cd to dynamic or empty target makes cwd unknown', () => {
+  const r = parseCommandLine('cd "$(mktemp -d)" && git status', { cwd: '/w' });
+  assert.equal(r.commands.find((c) => c.argv[0] === 'git').cwd, undefined);
+  const r2 = parseCommandLine("cd '' && git status", { cwd: '/w' });
+  assert.equal(r2.commands[1].cwd, undefined);
+});

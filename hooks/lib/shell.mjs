@@ -5,6 +5,7 @@ import path from 'node:path';
 class ParseError extends Error {}
 
 const STOP = new Set([' ', '\t', '\n', ';', '&', '|', '(', ')', '<', '>']);
+const KEYWORDS = new Set(['then', 'do', 'else', 'elif', '{', '}', '!', 'time', 'if', 'while', 'until', 'fi', 'done', 'esac']);
 const ENV_RE = /^[A-Za-z_][A-Za-z0-9_]*=/;
 
 export function parseCommandLine(src, opts = {}) {
@@ -101,6 +102,8 @@ function parseScript(src, startCwd) {
   let cwd = startCwd;
   let cur = null;
   let curStart = 0;
+  let timeOpts = false;
+  const cwdStack = [];
 
   const ensure = () => {
     if (!cur) {
@@ -116,10 +119,11 @@ function parseScript(src, startCwd) {
       cur.raw = src.slice(curStart, end).trim();
       commands.push(cur);
       if (cur.argv[0] === 'cd' && cur.argv.length > 1 && cur.argv[1] !== '-') {
-        cwd = resolveCwd(cwd, cur.argv[1]);
+        cwd = cur.argv[1] === '' ? undefined : resolveCwd(cwd, cur.argv[1]);
       }
     }
     cur = null;
+    timeOpts = false;
   };
 
   const substValue = (inner) => {
@@ -233,7 +237,9 @@ function parseScript(src, startCwd) {
       pending.length = 0;
       continue;
     }
-    if (c === ';' || c === '(' || c === ')') { flush(i); i++; continue; }
+    if (c === '(') { flush(i); cwdStack.push(cwd); i++; continue; }
+    if (c === ')') { flush(i); if (cwdStack.length) cwd = cwdStack.pop(); i++; continue; }
+    if (c === ';') { flush(i); i++; continue; }
     if (c === '&' && src[i + 1] !== '>') { flush(i); i += src[i + 1] === '&' ? 2 : 1; continue; }
     if (c === '|') { flush(i); i += src[i + 1] === '|' || src[i + 1] === '&' ? 2 : 1; continue; }
     if (c >= '0' && c <= '9') {
@@ -269,6 +275,10 @@ function parseScript(src, startCwd) {
     if (!cmd.argv.length && ENV_RE.test(src.slice(start))) {
       const name = ENV_RE.exec(src.slice(start))[0].slice(0, -1);
       cmd.env[name] = value.slice(name.length + 1);
+    } else if (!cmd.argv.length && !quoted && KEYWORDS.has(value)) {
+      timeOpts = value === 'time';
+    } else if (!cmd.argv.length && timeOpts && !quoted && value.startsWith('-')) {
+      // option of `time` (e.g. -p)
     } else if (value !== '' || quoted) {
       cmd.argv.push(value);
     }
