@@ -118,6 +118,8 @@ export function unregister(harness, env = process.env) {
     changed = true;
     if (kept.length) cfg.hooks[event] = kept; else delete cfg.hooks[event];
   }
+  // Leave no empty "hooks": {} behind when ours were the only hooks.
+  if (changed && Object.keys(cfg.hooks).length === 0) delete cfg.hooks;
   if (changed) writeConfig(file, cfg);
   return { changed };
 }

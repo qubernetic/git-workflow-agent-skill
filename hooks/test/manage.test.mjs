@@ -87,6 +87,15 @@ test('register writes through a symlinked settings file and keeps its mode', { s
   assert.equal(fs.lstatSync(file).isSymbolicLink(), true);
 });
 
+test('unregister drops the hooks key when only our entries were in it', () => {
+  const env = makeEnv();
+  const file = HARNESSES.claude.configPath(env);
+  fs.writeFileSync(file, JSON.stringify({ theme: 'dark' }));
+  register('claude', GUARD, env);
+  assert.equal(unregister('claude', env).changed, true);
+  assert.deepEqual(readJson(file), { theme: 'dark' });
+});
+
 test('unregister removes only ours', () => {
   const env = makeEnv();
   const file = HARNESSES.claude.configPath(env);
