@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import { parseCommandLine } from '../lib/shell.mjs';
 
 const gitOf = (r) => r.commands.find((c) => c.argv[0] === 'git');
@@ -38,7 +39,7 @@ test('cd sets cwd for following command', () => {
 test('relative cd resolves against opts.cwd', () => {
   const r = parseCommandLine('cd sub; git status', { cwd: '/a/b' });
   assert.equal(r.commands[0].cwd, '/a/b');
-  assert.equal(r.commands[1].cwd, '/a/b/sub');
+  assert.equal(r.commands[1].cwd, path.resolve('/a/b', 'sub'));
 });
 
 test('heredoc inside command substitution yields one argv word', () => {
@@ -122,7 +123,7 @@ test('unterminated quote is not ok', () => {
 
 test('subshell cd does not leak cwd', () => {
   const r = parseCommandLine('(cd sub && git status); git push', { cwd: '/w' });
-  assert.equal(r.commands.find((c) => c.argv[1] === 'status').cwd, '/w/sub');
+  assert.equal(r.commands.find((c) => c.argv[1] === 'status').cwd, path.resolve('/w', 'sub'));
   assert.equal(r.commands.find((c) => c.argv[1] === 'push').cwd, '/w');
   const r2 = parseCommandLine('(cd /x && git status); git push');
   assert.equal(r2.commands.find((c) => c.argv[1] === 'push').cwd, undefined);
@@ -157,7 +158,7 @@ test('cd does not persist across pipes or background', () => {
   }
   for (const src of ['cd sub && git push', 'cd sub; git push', 'cd sub || git push']) {
     const r = parseCommandLine(src, { cwd: '/w' });
-    assert.equal(r.commands.find((c) => c.argv[1] === 'push').cwd, '/w/sub', src);
+    assert.equal(r.commands.find((c) => c.argv[1] === 'push').cwd, path.resolve('/w', 'sub'), src);
   }
 });
 
