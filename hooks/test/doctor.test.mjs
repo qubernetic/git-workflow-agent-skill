@@ -125,7 +125,10 @@ test('warning checks do not fail doctor and print with !', async () => {
   assert.equal(rej.ok, true);
 });
 
-const GIT_ENV = { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: os.devNull, HOME: tmp };
+// An empty file, not os.devNull: Git for Windows cannot open \\.\nul as a config file.
+const EMPTY_GITCONFIG = path.join(tmp, 'empty-gitconfig');
+fs.writeFileSync(EMPTY_GITCONFIG, '');
+const GIT_ENV = { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: EMPTY_GITCONFIG, HOME: tmp };
 function git(cwd, ...args) {
   const r = spawnSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.com', '-c', 'commit.gpgsign=false', '-c', 'tag.gpgsign=false', ...args], { cwd, encoding: 'utf8', env: GIT_ENV });
   assert.equal(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`);
