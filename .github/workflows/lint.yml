@@ -1,4 +1,4 @@
-name: Lint SKILL.md
+name: Lint and guard tests
 
 on:
   pull_request:
