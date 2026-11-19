@@ -1,7 +1,7 @@
 # Workflow guard: enforcing the git-workflow skill in agent harnesses
 
 Date: 2026-11-19
-Status: draft, builder check done, awaiting the owner's approval
+Status: approved by the owner on 2026-11-19, ready for an implementation plan
 Issue: #102
 
 ## 1. Intent
@@ -224,18 +224,55 @@ context, only in git repositories where the guard is active (section 6.5). Kept 
 - Release follow-through: CHANGELOG version section, tag, GitHub Release,
   back-merge.
 
-## 8. Installation
+## 8. Installation and management commands
 
-- Install prints the chosen scope and, for `opt-in`, how to opt a repository in.
-- `scripts/install_linux.sh`, `install_macos.sh`, `install_windows.ps1` gain
-  a hooks step: detect which harnesses are installed and register the guard in
-  each one's **user-level** config, merging into the existing JSON/TOML
-  without touching other entries, idempotently. `--no-hooks` skips it;
-  `--uninstall` removes only our entries.
-- Git hooks are **per repository and opt-in**: `node hooks/guard.mjs
-  install-git-hooks` in a repo writes `commit-msg`/`pre-push` shims that
-  chain to any existing hook of the same name (Husky and `core.hooksPath`
-  setups respected; never overwrite).
+All installation and maintenance goes through one command-line surface in the
+engine, so there is a single implementation to maintain:
+
+```
+node hooks/guard.mjs install   [--scope opt-in|all] [--harness claude,codex,...]
+node hooks/guard.mjs update    # update the skill, then re-register the hooks
+node hooks/guard.mjs doctor    # check the installation, print a checklist
+node hooks/guard.mjs repair    # fix what doctor reports as broken
+node hooks/guard.mjs uninstall # remove only our entries
+node hooks/guard.mjs enable    [--git-hooks]  # opt the current repository in
+node hooks/guard.mjs disable   # opt the current repository out
+```
+
+- **install**: detects the installed harnesses and registers the guard in each
+  one's **user-level** config (agent hook + session-start hook), merging into
+  the existing JSON/TOML without touching other entries, idempotently. Writes
+  the scope to the user config and prints it; for `opt-in` it prints how to
+  enable a repository.
+- **update**: follows how the skill is installed. Symlinked clone (the
+  install scripts' layout): fetch and check out the latest release tag on the
+  clone, then re-register. Other layouts: print the manual step. Refuses when
+  the clone has local changes.
+- **doctor**: one line per check, ✓/✗ with the fix: Node.js version; per
+  detected harness, whether our entry exists and points to an existing
+  `guard.mjs`; the hook feature is enabled where a harness needs a flag (Codex
+  `hooks = true`); registered version equals the skill version; scope; for the
+  current repository: active or not, `.git-workflow.json` parses, git hook
+  shims present and chained; `gh` installed and authenticated (state rules
+  degrade without it). Exit code 1 when anything fails.
+- **repair**: re-runs the registration for what doctor marks broken; never
+  deletes foreign entries.
+- **enable** writes `.git-workflow.json` (`{}`) and, with `--git-hooks`, the
+  `commit-msg`/`pre-push` shims, chained to any existing hook of the same name
+  (Husky and `core.hooksPath` setups respected; never overwrite).
+- Entry points:
+  1. **Skill command**: SKILL.md gets a short "Guard commands" section mapping
+     requests to the commands above: `/git-workflow guard doctor`, or plain
+     language ("install the guard", "is the guard working?"). Works in every
+     harness that loads the skill.
+  2. **Directly** by a human: the same `node` commands.
+  3. **Install scripts**: `install_linux.sh`, `install_macos.sh`,
+     `install_windows.ps1` keep installing the skill and then call
+     `guard.mjs install` (skipped with `--no-hooks`); `--uninstall` calls
+     `guard.mjs uninstall`. No hook logic in the scripts.
+- Not done: a separate Claude Code plugin with its own slash commands. It
+  would work in one harness only and move distribution to a plugin
+  marketplace; `/git-workflow guard ...` gives the same without it.
 - Repository-level agent config (`.claude/settings.json` etc. committed into a
   project) is documented in the README, not automated.
 
@@ -272,6 +309,7 @@ context, only in git repositories where the guard is active (section 6.5). Kept 
 - Approach: zero-dependency Node.js engine + adapters + git hooks (2026-11-19).
 - Approval marker `WORKFLOW_GUARD_APPROVE=<PR#>` where the harness cannot ask (2026-11-19).
 - Scope chosen at install, default opt-in, `all` available (2026-11-19).
+- Management commands (install, update, doctor, repair, uninstall, enable, disable) in the engine, reachable as `/git-workflow guard ...`; install scripts delegate to them (2026-11-19).
 
 ## 12. Builder's calls (marked so the owner can check them)
 
