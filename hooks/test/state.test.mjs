@@ -80,12 +80,18 @@ test('timeout resolves null and timeoutMs is passed', async () => {
   assert.equal(f.calls[0].opts.timeoutMs, 50);
 });
 
-test('issueState maps OPEN/CLOSED, null when not found', async () => {
+test('issueState maps OPEN/CLOSED, MISSING when absent, null when unknown', async () => {
   let f = fake(() => ({ code: 0, stdout: '{"state":"OPEN"}' }));
   assert.equal(await createState({ cwd: '/r', exec: f.exec }).issueState(7), 'OPEN');
   assert.deepEqual(f.calls[0].args.slice(0, 3), ['issue', 'view', '7']);
   f = fake(() => ({ code: 0, stdout: '{"state":"CLOSED"}' }));
   assert.equal(await createState({ cwd: '/r', exec: f.exec }).issueState(7), 'CLOSED');
+  f = fake(() => ({ code: 1, stdout: '', stderr: 'GraphQL: Could not resolve to an Issue with the number of 7. (repository.issue)' }));
+  assert.equal(await createState({ cwd: '/r', exec: f.exec }).issueState(7), 'MISSING');
+  f = fake(() => ({ code: 1, stdout: '', stderr: 'issue not found' }));
+  assert.equal(await createState({ cwd: '/r', exec: f.exec }).issueState(7), 'MISSING');
+  f = fake(() => ({ code: 4, stdout: '', stderr: 'error connecting to api.github.com' }));
+  assert.equal(await createState({ cwd: '/r', exec: f.exec }).issueState(7), null);
   f = fake(() => ({ code: 1, stdout: '' }));
   assert.equal(await createState({ cwd: '/r', exec: f.exec }).issueState(7), null);
 });
@@ -126,7 +132,7 @@ test('showFile returns content or null', async () => {
 
 test('defaultExec: runs a process, returns non-zero code, rejects on ENOENT and timeout', async () => {
   const ok = await defaultExec(process.execPath, ['-e', 'process.stdout.write("hi")'], { cwd: process.cwd(), timeoutMs: 5000 });
-  assert.deepEqual(ok, { code: 0, stdout: 'hi' });
+  assert.deepEqual(ok, { code: 0, stdout: 'hi', stderr: '' });
   const bad = await defaultExec(process.execPath, ['-e', 'process.exit(3)'], { cwd: process.cwd(), timeoutMs: 5000 });
   assert.equal(bad.code, 3);
   await assert.rejects(defaultExec('gwg-no-such-binary', [], { cwd: process.cwd(), timeoutMs: 1000 }));

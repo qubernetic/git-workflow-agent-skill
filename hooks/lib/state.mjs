@@ -2,14 +2,14 @@ import { execFile } from 'node:child_process';
 
 const FETCH_TIMEOUT_MS = 10000;
 
-// Resolves {code, stdout} for any process that ran to completion (including
+// Resolves {code, stdout, stderr} for any process that ran to completion (including
 // non-zero exit). Rejects when the process cannot start or is killed by timeout.
 export function defaultExec(cmd, args, { cwd, timeoutMs = 3000 } = {}) {
   return new Promise((resolve, reject) => {
     execFile(cmd, args, { cwd, timeout: timeoutMs, windowsHide: true, maxBuffer: 10 * 1024 * 1024, encoding: 'utf8' },
-      (err, stdout) => {
-        if (!err) return resolve({ code: 0, stdout });
-        if (typeof err.code === 'number' && !err.killed) return resolve({ code: err.code, stdout: stdout ?? '' });
+      (err, stdout, stderr) => {
+        if (!err) return resolve({ code: 0, stdout, stderr: stderr ?? '' });
+        if (typeof err.code === 'number' && !err.killed) return resolve({ code: err.code, stdout: stdout ?? '', stderr: stderr ?? '' });
         reject(err);
       });
   });
@@ -37,7 +37,7 @@ export function createState({ cwd, exec = defaultExec, timeoutMs = 3000 } = {}) 
     }),
     issueState: (n) => memo(`issueState:${n}`, async () => {
       const r = await run('gh', ['issue', 'view', String(n), '--json', 'state']);
-      if (r.code !== 0) return null;
+      if (r.code !== 0) return /could not resolve|not found/i.test(r.stderr ?? '') ? 'MISSING' : null;
       const state = JSON.parse(r.stdout).state;
       return state === 'OPEN' || state === 'CLOSED' ? state : null;
     }),

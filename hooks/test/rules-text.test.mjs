@@ -8,7 +8,8 @@ const pr = (texts, flags = {}, sub = 'pr create') => mk({ tool: 'gh', sub, texts
 const ctx = (branch = 'feature/9-x', rules = {}, extra = {}) => ({
   state: { currentBranch: async () => branch }, config: { rules, attributionPatterns: [], ...extra }, askSupported: true, env: {},
 });
-const run = (a, c = ctx()) => evaluate([a], c);
+const TEXT_IDS = ['no-ai-attribution', 'conventional-commit', 'conventional-title', 'closes-one-per-line'];
+const run = async (a, c = ctx()) => (await evaluate([a], c)).filter((f) => TEXT_IDS.includes(f.rule));
 const one = async (a, c) => { const r = await run(a, c); return r.length ? [r[0].rule, r[0].decision] : null; };
 
 test('claude co-author trailer is denied', async () => {
@@ -84,7 +85,8 @@ test('checkCommitMessage is shared and applies config', () => {
   assert.equal(checkCommitMessage('bad', { rules: { 'conventional-commit': 'off' } }).length, 0);
 });
 test('RULES ids', () => {
-  assert.deepEqual(RULES.map((r) => r.id), ['no-ai-attribution', 'conventional-commit', 'conventional-title', 'closes-one-per-line', 'merge-method', 'merge-gate', 'test-plan-ticked']);
+  assert.deepEqual(RULES.map((r) => r.id), ['no-ai-attribution', 'conventional-commit', 'conventional-title', 'closes-one-per-line', 'merge-method', 'merge-gate', 'test-plan-ticked',
+    'protected-commit', 'force-push', 'protected-delete', 'no-verify', 'branch-name', 'branch-issue', 'fresh-base', 'pr-base', 'tag-on-main']);
 });
 
 const editCtx = (view) => ({ ...ctx(), state: { currentBranch: async () => 'x', prView: async () => view } });
