@@ -95,7 +95,8 @@ Or invoke directly:
 
 | Rule | Description |
 |------|-------------|
-| **Gitflow branching** | `main`, `develop`, `feature/*`, `fix/*`, `hotfix/*`, `release/*` |
+| **Gitflow branching** | `main`, `develop`, `feature/*`, `fix/*`, `hotfix/*`, `release/*`, `epic/*` |
+| **Epics** | Multi-slice plans run on an `epic/*` branch; slices merge freely, one reviewed epic PR reaches `develop` |
 | **Conventional Commits** | Structured messages — `feat:`, `fix:`, `docs:`, `chore:`, etc. |
 | **Atomic commits** | One logical change per commit, no mixed concerns |
 | **`--no-ff` merges** | All merges into protected branches preserve branch topology |
@@ -165,6 +166,7 @@ gitGraph
 | `fix/<issue>-<slug>` | `develop` | `develop` | Bug fixes |
 | `hotfix/<issue>-<slug>` | `main` | `main` + `develop` | Urgent production fixes |
 | `release/<version>` | `develop` | `main` + `develop` | Release preparation |
+| `epic/<issue>-<slug>` | `develop` | `develop` | Plan of two or more slices; slice branches use the epic as base |
 
 ## Commit Format
 
@@ -248,7 +250,7 @@ Add to your GitHub Actions workflow:
   if: github.event_name == 'pull_request'
   run: |
     BRANCH="${{ github.head_ref }}"
-    PATTERN="^(feature|fix|docs|hotfix|release)/[a-z0-9-]+$"
+    PATTERN="^(feature|fix|docs|hotfix|release|epic)/[a-z0-9-]+$"
     if [[ ! "$BRANCH" =~ $PATTERN ]]; then
       echo "::error::Branch '$BRANCH' doesn't match pattern: $PATTERN"
       exit 1
