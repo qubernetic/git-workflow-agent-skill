@@ -106,6 +106,59 @@ Or invoke directly:
 | **PR-only merges** | `main` and `develop` are never committed to directly |
 | **Conventional PR titles** | PR titles follow Conventional Commits format |
 
+## Workflow Guard (optional)
+
+The skill relies on the agent following the rules. The guard is optional tooling in `hooks/` that checks the mechanical ones before a command runs: no AI attribution, Conventional Commits, no commits on `main`/`develop`, branch names and their issues, no force-push or `--no-verify`, `gh pr merge --merge` only, a human approval for merges into `main` and `develop`, and more (the full rule list is in the Enforcement section of `SKILL.md`). It needs `node` 20 or newer, has no dependencies, and fails open: if it cannot parse or query something, it allows the command and prints a warning.
+
+### Install
+
+The install scripts register the guard right after the skill symlink when `node` is found:
+
+```bash
+./scripts/install_linux.sh                 # or install_macos.sh; skill + guard hooks
+./scripts/install_linux.sh --scope all     # guard active in every repository
+./scripts/install_linux.sh --no-hooks      # skill only
+```
+
+```powershell
+.\scripts\install_windows.ps1 -Scope all   # -NoHooks and -Uninstall work too
+```
+
+You can also ask Claude Code ("install the guard", "is the guard working?") or run the guard directly: `node hooks/guard.mjs install|update|doctor|repair|uninstall|enable|disable`. `install` accepts `--scope opt-in|all` and `--harness claude,codex`. Run `doctor` to check the registration.
+
+### Scope and per-repository config
+
+- `opt-in` (default): the guard is active only in repositories that contain a `.git-workflow.json`. Create it with `node hooks/guard.mjs enable` (add `--git-hooks` to install the `commit-msg` and `pre-push` git hooks too).
+- `all`: active in every repository.
+
+The scope lives in the user config (`$XDG_CONFIG_HOME/git-workflow-guard/config.json`, falling back to `~/.config/...`; on Windows `%APPDATA%\git-workflow-guard\config.json`). `.git-workflow.json` is optional settings, and `{}` is valid:
+
+```json
+{
+  "protectedBranches": ["main", "develop"],
+  "branchTypes": ["feature", "fix", "hotfix", "epic"],
+  "attributionPatterns": [],
+  "rules": { "merge-gate": "ask", "fresh-base": "warn", "tag-on-main": "off" }
+}
+```
+
+A rule level is one of `on`, `off`, `warn`, `ask`, `deny`.
+
+### Harness support
+
+| Harness | Status |
+|---------|--------|
+| Claude Code | supported |
+| Codex CLI | supported (enable `[features] hooks = true` in `~/.codex/config.toml` and trust the hooks) |
+| Copilot CLI, Gemini CLI, Cursor | planned |
+| GitHub MCP write tools | not covered |
+
+### Good to know
+
+- The git-hook shims run `node`, so `node` must be on git's `PATH`. This matters for GUI git clients, which often start with a smaller `PATH` than your shell.
+- A direct `git push` to a protected branch is caught by the `pre-push` git hook, not by the agent-layer hook. Install the git hooks (`enable --git-hooks`) to get that check.
+- Where a harness cannot ask for approval, a merge into `main` or `develop` is denied unless the command line carries `WORKFLOW_GUARD_APPROVE=<PR number>`.
+
 ## Branch Model
 
 ```mermaid
