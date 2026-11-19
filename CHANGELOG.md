@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Epic branches (`epic/<issue>-<slug>`) for plans of two or more slices: epic issue format with `epic` label, slice PRs into the epic without an approval gate, develop sync via PR, epic PR as the single merge gate into `develop`, tracking epics without a branch (#99)
 
+### Changed
+
+- Rebase is regulated instead of forbidden: a per-branch rebase table (shared branches never, own single-owner branches with `--force-with-lease`, approved PRs only fixup folding or rebase onto base, stacks via `--update-refs`), recipes for rebase onto base, non-interactive autosquash and `--onto`; forbidden list and troubleshooting updated (#101)
+
 ## [1.4.0] - 2026-03-28
 
 ### Added
