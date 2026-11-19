@@ -155,6 +155,24 @@ A rule level is one of `on`, `off`, `warn`, `ask`, `deny`. `on` keeps the rule's
 | Copilot CLI, Gemini CLI, Cursor | planned |
 | GitHub MCP write tools | not covered |
 
+### What has been tested
+
+"Supported" above means the adapter exists. The setups below are the ones actually exercised before release; anything not listed has **not been tested** and may not work.
+
+| Setup | Tested | How |
+|-------|--------|-----|
+| Linux + Claude Code | yes | automated suite; manual run in throwaway local and GitHub repositories (default, `auto` and `dontAsk` permission modes) |
+| Linux + Codex CLI 0.170 | yes | manual run in throwaway local and GitHub repositories |
+| Linux install script | yes | run with a temporary `HOME` (install, re-run, `--no-hooks`, `--uninstall`) |
+| Windows + Claude Code (Git Bash) | yes | automated suite (2 symlink tests skipped) and manual run on one Windows VM; git-hook shims checked over SSH |
+| Windows + Codex CLI | **no** | |
+| Windows PowerShell commands (agent's PowerShell tool) | **no** | not guarded yet, planned |
+| Windows install script (`install_windows.ps1`) | **no** | not executed; the VM test called `guard.mjs install` directly |
+| macOS (any harness, `install_macos.sh`) | **no** | script only syntax-checked; the CI matrix includes macOS, but no manual run |
+| Node 20 (minimum) | CI only | the CI matrix runs Node 20; local and manual runs used Node 26 |
+| Copilot CLI, Gemini CLI, Cursor | **no** | no adapter yet |
+| GUI git clients with the git-hook shims | **no** | see the `PATH` note below |
+
 ### Good to know
 
 - The git-hook shims run `node`, so `node` must be on git's `PATH`. This matters for GUI git clients, which often start with a smaller `PATH` than your shell.
