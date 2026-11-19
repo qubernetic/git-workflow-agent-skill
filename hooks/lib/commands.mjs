@@ -21,9 +21,10 @@
 //     git push      : -f force, -d delete, -u set-upstream
 //     git tag       : -m message, -F file
 //   Combined short flags (`-am msg`, `-fu`) are split; a value flag takes the rest of the
-//   cluster or the next argument.
+//   cluster or the next argument. git commit -u<mode> and -S<keyid> take only an attached value.
+//   git commit --trailer values are appended to texts.message (texts.trailers without a message).
 // Git global options (-C <dir>, -c k=v, --no-pager, -P, ...) are skipped; -C folds into cwd.
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 
 const GH_TEXT = { t: 'title', b: 'body', B: 'base', H: 'head', F: 'body-file', R: 'repo' };
@@ -45,7 +46,7 @@ const gh = ['title', 'body', 'body-file', 'base', 'head', 'repo', 'a', 'assignee
   'remove-project', 'remove-milestone'];
 const VALUE_FLAGS = {
   'git commit': ['message', 'file', 'C', 'c', 'reuse-message', 'reedit-message', 'author', 'date',
-    'cleanup', 'template', 't', 'fixup', 'squash'],
+    'cleanup', 'template', 't', 'fixup', 'squash', 'trailer'],
   'git push': ['o', 'push-option', 'repo', 'receive-pack', 'exec'],
   'git checkout': ['b', 'B', 'orphan', 'conflict', 'pathspec-from-file'],
   'git switch': ['c', 'C', 'create', 'force-create', 'orphan', 'conflict'],
@@ -61,6 +62,11 @@ const VALUE_FLAGS = {
   'gh issue edit': gh,
 };
 
+// Short flags whose value is optional and only ever attached (`-uno`, `-S<keyid>`).
+const OPTIONAL_ATTACHED = {
+  'git commit': ['u', 'S'],
+};
+
 const GIT_SUBS = new Set(['commit', 'push', 'checkout', 'switch', 'branch', 'worktree', 'tag']);
 const GH_SUBS = {
   pr: new Set(['create', 'edit', 'merge']),
@@ -71,8 +77,15 @@ const GIT_GLOBAL_VALUE = new Set(['--git-dir', '--work-tree', '--namespace', '--
 
 const base = (s) => String(s ?? '').replace(/^.*[\\/]/, '').replace(/\.exe$/i, '');
 
+const MAX_TEXT_FILE = 1024 * 1024;
+
+// Regular files up to 1 MiB only: a FIFO or device could hang the hook. Anything else is unknown.
 function defaultReadFile(p) {
-  try { return readFileSync(p, 'utf8'); } catch { return null; }
+  try {
+    const st = statSync(p);
+    if (!st.isFile() || st.size > MAX_TEXT_FILE) return null;
+    return readFileSync(p, 'utf8');
+  } catch { return null; }
 }
 
 function resolveDir(dir, cwd) {
@@ -113,11 +126,15 @@ function skipGhRepo(argv) {
 function parseArgs(args, key) {
   const aliases = ALIASES[key] ?? {};
   const valueFlags = new Set(VALUE_FLAGS[key] ?? []);
+  const optionalAttached = new Set(OPTIONAL_ATTACHED[key] ?? []);
   const flags = new Map();
   const positionals = [];
   const set = (name, val) => {
-    if (name === 'message' && typeof val === 'string' && typeof flags.get(name) === 'string') {
-      flags.set(name, `${flags.get(name)}\n\n${val}`);
+    const prev = flags.get(name);
+    if (name === 'message' && typeof val === 'string' && typeof prev === 'string') {
+      flags.set(name, `${prev}\n\n${val}`);
+    } else if (name === 'trailer' && typeof val === 'string' && typeof prev === 'string') {
+      flags.set(name, `${prev}\n${val}`);
     } else flags.set(name, val);
   };
   for (let i = 0; i < args.length; i++) {
@@ -132,6 +149,10 @@ function parseArgs(args, key) {
     } else if (a.startsWith('-') && a.length > 1) {
       for (let j = 1; j < a.length; j++) {
         const name = aliases[a[j]] ?? a[j];
+        if (optionalAttached.has(a[j])) {
+          set(name, a.slice(j + 1) || true);
+          break;
+        }
         if (valueFlags.has(name)) {
           const rest = a.slice(j + 1);
           if (rest) set(name, rest);
@@ -183,7 +204,12 @@ export function recognise(cmd, readFile = defaultReadFile) {
       const t = fileText(flags.get('file'));
       if (t != null) parts.push(t);
     }
-    if (parts.length) texts.message = parts.join('\n\n');
+    // --trailer values ("Key: value" or "Key=value"), one per line, for attribution scans.
+    const trailer = flags.get('trailer');
+    const trailers = typeof trailer === 'string'
+      ? trailer.split('\n').map((t) => t.replace(/^([A-Za-z0-9-]+)\s*=\s*/, '$1: ')).join('\n') : null;
+    if (parts.length) texts.message = parts.join('\n\n') + (trailers ? `\n\n${trailers}` : '');
+    else if (trailers) texts.trailers = trailers;
   } else if (tool === 'gh' && /create|edit|merge/.test(sub)) {
     const title = flags.get(sub === 'pr merge' ? 'subject' : 'title');
     if (typeof title === 'string') texts.title = title;

@@ -97,6 +97,15 @@ test('wrappers are unwrapped: env, sudo, bash -c, nested', async () => {
   assert.equal((await run(`bash -c 'gh pr merge 3 --merge'`)).decision, 'allow');
 });
 
+test('git commit --trailer attribution is denied', async () => {
+  const r = await run('git commit -m "feat: add x" --trailer "Co-authored-by: Claude <noreply@anthropic.com>"');
+  assert.equal(r.decision, 'deny');
+  assert.match(r.reason, /no-ai-attribution/);
+  const r2 = await run('git commit --trailer "Co-authored-by: Claude <noreply@anthropic.com>"');
+  assert.match(r2.reason, /no-ai-attribution/);
+  assert.doesNotMatch(r2.reason, /conventional-commit/);
+});
+
 test('timeout, xargs and eval wrappers are unwrapped', async () => {
   for (const cmd of [
     'timeout 60 gh pr merge 5 --squash',

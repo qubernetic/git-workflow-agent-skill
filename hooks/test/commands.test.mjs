@@ -190,3 +190,41 @@ test('gh -R/--repo is accepted before the group and between group and verb', () 
   assert.equal(rec('gh issue edit 3 -R o/r').flags.get('repo'), 'o/r');
   assert.equal(rec('gh -R o/r auth status'), null);
 });
+
+test('git commit -u takes an optional attached mode and is never -n', () => {
+  const a = rec('git commit -uno -m "feat: x"');
+  assert.equal(a.flags.has('no-verify'), false);
+  assert.equal(a.flags.get('u'), 'no');
+  assert.equal(a.texts.message, 'feat: x');
+  const b = rec('git commit -u -m "feat: x"');
+  assert.equal(b.flags.get('u'), true);
+  assert.equal(b.flags.get('message'), 'feat: x');
+  assert.equal(rec('git commit -nu -m "feat: x"').flags.get('no-verify'), true);
+  assert.equal(rec('git commit -Sabc -m "feat: x"').flags.get('message'), 'feat: x');
+});
+
+test('git commit --trailer values join texts.message for attribution scans', () => {
+  const a = rec('git commit -m "feat: x" --trailer "Co-authored-by: Claude <a@b>" --trailer=Reviewed-by=Jane');
+  assert.equal(a.texts.message, 'feat: x\n\nCo-authored-by: Claude <a@b>\nReviewed-by: Jane');
+  const b = rec('git commit --trailer "Co-authored-by: Claude <a@b>"');
+  assert.equal(b.texts.message, undefined);
+  assert.equal(b.texts.trailers, 'Co-authored-by: Claude <a@b>');
+});
+
+test('-F/--body-file read only regular files up to 1 MiB', async () => {
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const { spawnSync } = await import('node:child_process');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gwg-cmd-'));
+  fs.writeFileSync(path.join(dir, 'ok.txt'), 'feat: ok');
+  fs.writeFileSync(path.join(dir, 'big.txt'), Buffer.alloc(1024 * 1024 + 1, 'a'));
+  fs.mkdirSync(path.join(dir, 'sub'));
+  assert.equal(rec('git commit -F ok.txt', undefined, { cwd: dir }).texts.message, 'feat: ok');
+  assert.equal(rec('git commit -F big.txt', undefined, { cwd: dir }).texts.message, undefined);
+  assert.equal(rec('git commit -F sub', undefined, { cwd: dir }).texts.message, undefined);
+  assert.equal(rec('gh pr create --body-file sub', undefined, { cwd: dir }).texts.body, undefined);
+  if (process.platform !== 'win32' && spawnSync('mkfifo', [path.join(dir, 'fifo')]).status === 0) {
+    assert.equal(rec('git commit -F fifo', undefined, { cwd: dir }).texts.message, undefined);
+  }
+});
