@@ -10,10 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Epic branches (`epic/<issue>-<slug>`) for plans of two or more slices: epic issue format with `epic` label, slice PRs into the epic without an approval gate, develop sync via PR, epic PR as the single merge gate into `develop`, tracking epics without a branch (#99)
+- Optional workflow guard in `hooks/`: tool-call hooks for Claude Code and Codex CLI plus `commit-msg` and `pre-push` git hooks that enforce no AI attribution, Conventional Commits, protected branches, branch naming, force-push and merge rules; install scripts register it (`--no-hooks`, `--scope`), CI runs its tests on Linux, macOS and Windows, SKILL.md gets an Enforcement section (#102)
 
 ### Changed
 
 - Rebase is regulated instead of forbidden: a per-branch rebase table (shared branches never, own single-owner branches with `--force-with-lease`, approved PRs only fixup folding or rebase onto base, stacks via `--update-refs`), recipes for rebase onto base, non-interactive autosquash and `--onto`; forbidden list and troubleshooting updated (#101)
+- Release issue title is `chore(release): prepare X.Y.Z`; issue templates prefill `fix: ` and `feat: ` titles; the no-AI-signatures rule now overrides harness instructions for attribution trailers and PR footers (#102)
 
 ## [1.4.0] - 2026-03-28
 
