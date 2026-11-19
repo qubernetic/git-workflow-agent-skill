@@ -44,7 +44,7 @@ Enforce a disciplined Gitflow-based development workflow. Every git operation fo
 | Branch | Purpose | Merge via |
 |--------|---------|-----------|
 | `main` | Production-ready code | PR only (from `release/*` or `hotfix/*`) |
-| `develop` | Integration branch for next release | PR only (from `feature/*`, `fix/*` or `epic/*`) |
+| `develop` | Integration branch for next release | PR only (from `feature/*`, `fix/*`, `docs/*`, `ci/*`, `perf/*` or `epic/*`) |
 
 ### Working Branches
 
@@ -52,11 +52,16 @@ Enforce a disciplined Gitflow-based development workflow. Every git operation fo
 |---------|-------------|-------------|---------|
 | `feature/<issue>-<slug>` | `develop` | `develop` | New features |
 | `fix/<issue>-<slug>` | `develop` | `develop` | Bug fixes on develop |
+| `docs/<issue>-<slug>` | `develop` | `develop` | Documentation-only changes (`docs` commits) |
+| `ci/<issue>-<slug>` | `develop` | `develop` | CI pipeline changes (`ci` commits) |
+| `perf/<issue>-<slug>` | `develop` | `develop` | Performance improvements (`perf` commits) |
 | `hotfix/<issue>-<slug>` | `main` | `main` AND `develop` | Urgent production fixes |
 | `release/<version>` | `develop` | `main` AND `develop` | Release preparation |
 | `epic/<issue>-<slug>` | `develop` | `develop` | Integration branch for a plan of two or more slices (see [Epics](#epics)) |
 
-A slice of an epic is an ordinary `feature/*` or `fix/*` branch whose base and merge target is the epic branch instead of `develop`.
+`docs/*`, `ci/*` and `perf/*` are for changes made of that one commit type. A feature or fix that also touches docs or CI stays on `feature/*` or `fix/*`.
+
+A slice of an epic is an ordinary working branch (`feature/*`, `fix/*`, `docs/*`, `ci/*` or `perf/*`) whose base and merge target is the epic branch instead of `develop`.
 
 ### Sync Before Branching
 
@@ -68,7 +73,7 @@ git pull origin develop          # ← mandatory before branching
 git checkout -b feature/42-slug
 ```
 
-This applies to every branch type: `feature/*`, `fix/*` and `epic/*` pull `develop`, `hotfix/*` pulls `main`, `release/*` pulls `develop`. A slice of an epic pulls its epic branch (`git pull origin epic/<issue>-<slug>`).
+This applies to every branch type: `feature/*`, `fix/*`, `docs/*`, `ci/*`, `perf/*` and `epic/*` pull `develop`, `hotfix/*` pulls `main`, `release/*` pulls `develop`. A slice of an epic pulls its epic branch (`git pull origin epic/<issue>-<slug>`).
 
 ### Merge Strategy
 
@@ -128,10 +133,10 @@ git push --force-with-lease origin <each-rewritten-branch>
 ### Branch Naming Convention
 
 - Always lowercase, hyphen-separated
-- Working branches (`feature/*`, `fix/*`, `hotfix/*`) are prefixed with the issue number
+- Working branches (`feature/*`, `fix/*`, `docs/*`, `ci/*`, `perf/*`, `hotfix/*`) are prefixed with the issue number
 - Release branches use version number only: `release/<version>`
 - Epic branches use the number of the dedicated epic issue: `epic/<epic-issue>-<slug>`
-- Examples: `feature/42-add-search`, `fix/17-broken-navbar`, `hotfix/89-auth-crash`, `release/1.2.0`, `epic/34-pre-alpha`
+- Examples: `feature/42-add-search`, `fix/17-broken-navbar`, `docs/51-api-guide`, `ci/52-cache-deps`, `perf/53-lazy-load`, `hotfix/89-auth-crash`, `release/1.2.0`, `epic/34-pre-alpha`
 
 ---
 
@@ -723,10 +728,13 @@ Deliberate recovery on a shared branch (the force-push and secret-purge procedur
 |-----------|-------------|------|
 | New feature | `feature/*` | `develop` |
 | Bug found during development | `fix/*` | `develop` |
+| Documentation only | `docs/*` | `develop` |
+| CI pipeline only | `ci/*` | `develop` |
+| Performance improvement | `perf/*` | `develop` |
 | Bug found in production | `hotfix/*` | `main` |
 | Preparing a release | `release/*` | `develop` |
 | Plan with two or more slices | `epic/*` | `develop` |
-| Slice of an open epic | `feature/*` or `fix/*` | the epic branch |
+| Slice of an open epic | `feature/*`, `fix/*`, `docs/*`, `ci/*` or `perf/*` | the epic branch |
 
 ### "What commit type do I use?"
 
