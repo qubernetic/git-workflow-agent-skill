@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-19
+
 ### Added
 
 - `docs/*`, `ci/*` and `perf/*` working branches for single-type changes: base and merge target `develop` (or an epic), accepted by the guard's default `branchTypes` and `pr-base` table (#103)
@@ -152,6 +154,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CONTRIBUTING.md contribution guidelines
 - GitHub issue and PR templates
 
+[1.6.0]: https://github.com/qubernetic/git-workflow-agent-skill/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/qubernetic/git-workflow-agent-skill/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/qubernetic/git-workflow-agent-skill/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/qubernetic/git-workflow-agent-skill/compare/v1.2.0...v1.3.0
