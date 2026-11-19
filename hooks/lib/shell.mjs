@@ -18,7 +18,8 @@ export function parseCommandLine(src, opts = {}) {
 }
 
 function resolveCwd(base, target) {
-  if (path.isAbsolute(target) || !base) return target;
+  if (path.isAbsolute(target)) return target;
+  if (!base) return undefined;
   return path.resolve(base, target);
 }
 
@@ -103,6 +104,7 @@ function parseScript(src, startCwd) {
   let cur = null;
   let curStart = 0;
   let timeOpts = false;
+  let afterPipe = false;
   const cwdStack = [];
 
   const ensure = () => {
@@ -113,12 +115,14 @@ function parseScript(src, startCwd) {
     return cur;
   };
 
-  const flush = (end) => {
+  const flush = (end, local = false) => {
+    const isLocal = local || afterPipe;
+    afterPipe = false;
     if (cur && cur.argv.length) {
       cur.cwd = cwd;
       cur.raw = src.slice(curStart, end).trim();
       commands.push(cur);
-      if (cur.argv[0] === 'cd' && cur.argv.length > 1 && cur.argv[1] !== '-') {
+      if (!isLocal && cur.argv[0] === 'cd' && cur.argv.length > 1 && cur.argv[1] !== '-') {
         cwd = cur.argv[1] === '' ? undefined : resolveCwd(cwd, cur.argv[1]);
       }
     }
@@ -240,8 +244,16 @@ function parseScript(src, startCwd) {
     if (c === '(') { flush(i); cwdStack.push(cwd); i++; continue; }
     if (c === ')') { flush(i); if (cwdStack.length) cwd = cwdStack.pop(); i++; continue; }
     if (c === ';') { flush(i); i++; continue; }
-    if (c === '&' && src[i + 1] !== '>') { flush(i); i += src[i + 1] === '&' ? 2 : 1; continue; }
-    if (c === '|') { flush(i); i += src[i + 1] === '|' || src[i + 1] === '&' ? 2 : 1; continue; }
+    if (c === '&' && src[i + 1] !== '>') {
+      const and = src[i + 1] === '&';
+      flush(i, !and); i += and ? 2 : 1; continue;
+    }
+    if (c === '|') {
+      const or = src[i + 1] === '|';
+      flush(i, !or);
+      afterPipe = !or;
+      i += or || src[i + 1] === '&' ? 2 : 1; continue;
+    }
     if (c >= '0' && c <= '9') {
       const m = /^\d+(?=[<>])/.exec(src.slice(i, i + 12));
       if (m) { i += m[0].length; continue; }

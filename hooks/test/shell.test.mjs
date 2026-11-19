@@ -149,3 +149,19 @@ test('cd to dynamic or empty target makes cwd unknown', () => {
   const r2 = parseCommandLine("cd '' && git status", { cwd: '/w' });
   assert.equal(r2.commands[1].cwd, undefined);
 });
+
+test('cd does not persist across pipes or background', () => {
+  for (const src of ['cd sub | git push', 'cd sub & git push', 'git log | cd sub; git push']) {
+    const r = parseCommandLine(src, { cwd: '/w' });
+    assert.equal(r.commands.find((c) => c.argv[1] === 'push').cwd, '/w', src);
+  }
+  for (const src of ['cd sub && git push', 'cd sub; git push', 'cd sub || git push']) {
+    const r = parseCommandLine(src, { cwd: '/w' });
+    assert.equal(r.commands.find((c) => c.argv[1] === 'push').cwd, '/w/sub', src);
+  }
+});
+
+test('relative cd from unknown base stays unknown', () => {
+  const r = parseCommandLine("cd '' ; cd sub; git status", { cwd: '/w' });
+  assert.equal(r.commands.find((c) => c.argv[0] === 'git').cwd, undefined);
+});
