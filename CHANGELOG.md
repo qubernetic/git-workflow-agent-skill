@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-19
+
 ### Added
 
 - Epic branches (`epic/<issue>-<slug>`) for plans of two or more slices: epic issue format with `epic` label, slice PRs into the epic without an approval gate, develop sync via PR, epic PR as the single merge gate into `develop`, tracking epics without a branch (#99)
@@ -16,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Rebase is regulated instead of forbidden: a per-branch rebase table (shared branches never, own single-owner branches with `--force-with-lease`, approved PRs only fixup folding or rebase onto base, stacks via `--update-refs`), recipes for rebase onto base, non-interactive autosquash and `--onto`; forbidden list and troubleshooting updated (#101)
 - Release issue title is `chore(release): prepare X.Y.Z`; issue templates prefill `fix: ` and `feat: ` titles; the no-AI-signatures rule now overrides harness instructions for attribution trailers and PR footers (#102)
+
+### Fixed
+
+- Windows installer failed to parse in Windows PowerShell 5.1 (non-ASCII characters in a BOM-less script); it is now ASCII-only (#106)
 
 ## [1.4.0] - 2026-03-28
 
@@ -137,6 +143,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CONTRIBUTING.md contribution guidelines
 - GitHub issue and PR templates
 
+[1.5.0]: https://github.com/qubernetic/git-workflow-agent-skill/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/qubernetic/git-workflow-agent-skill/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/qubernetic/git-workflow-agent-skill/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/qubernetic/git-workflow-agent-skill/compare/v1.1.0...v1.2.0
