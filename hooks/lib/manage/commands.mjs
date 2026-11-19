@@ -49,7 +49,7 @@ export function install({ scope, harnesses, env = process.env } = {}) {
   const finalScope = scope ?? (kept ? existing.scope : 'opt-in');
   const cfg = {
     scope: finalScope, version: skillVersion(), guardPath: GUARD_PATH,
-    harnesses: [...new Set([...(existing?.harnesses ?? []), ...registered])],
+    harnesses: [...new Set([...(Array.isArray(existing?.harnesses) ? existing.harnesses : []), ...registered])],
   };
   writeFileThrough(file, `${JSON.stringify(cfg, null, 2)}\n`);
   lines.push(`user config written to ${file} (scope: ${finalScope}${kept ? ', kept' : ''})`);

@@ -225,3 +225,11 @@ test('install keeps harnesses from earlier runs', () => {
   install({ harnesses: ['codex'], env });
   assert.deepEqual(readJson(userConfigPath(env)).harnesses.sort(), ['claude', 'codex']);
 });
+
+test('install ignores a non-array harnesses list in the user config', () => {
+  const env = makeEnv();
+  install({ harnesses: ['claude'], env });
+  fs.writeFileSync(userConfigPath(env), '{"scope":"opt-in","harnesses":"codex"}');
+  install({ harnesses: ['claude'], env });
+  assert.deepEqual(readJson(userConfigPath(env)).harnesses, ['claude']);
+});
