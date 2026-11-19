@@ -97,3 +97,20 @@ export function unregister(harness, env = process.env) {
   if (changed) writeConfig(file, cfg);
   return { changed };
 }
+
+// Our entries in a harness config: [{event, group, hook, command}], group/hook are array indices.
+// Throws when the file is malformed; a missing file yields [].
+export function ourEntries(harness, env = process.env) {
+  const cfg = readConfig(HARNESSES[harness].configPath(env));
+  const found = [];
+  for (const [event, list] of Object.entries(cfg.hooks ?? {})) {
+    if (!Array.isArray(list)) continue;
+    list.forEach((entry, group) => {
+      if (!isOurs(entry)) return;
+      entry.hooks.forEach((h, hook) => {
+        if (OURS.test(h?.command ?? '')) found.push({ event, group, hook, command: h.command });
+      });
+    });
+  }
+  return found;
+}

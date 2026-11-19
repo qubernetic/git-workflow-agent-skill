@@ -54,7 +54,7 @@ const flag = (args, name) => { const i = args.indexOf(name); return i === -1 ? u
 // Management commands print report lines; exit 1 on failure.
 const manageCmd = (fn) => async (args) => {
   try {
-    for (const l of fn(args)) process.stdout.write(`${l}\n`);
+    for (const l of await fn(args)) process.stdout.write(`${l}\n`);
     return 0;
   } catch (e) {
     process.stderr.write(`git-workflow guard: ${e.message}\n`);
@@ -62,7 +62,18 @@ const manageCmd = (fn) => async (args) => {
   }
 };
 
-// Later tasks add: update, doctor, repair.
+// Prints the doctor checklist; exit 1 when a non-warning check fails.
+async function doctorCmd() {
+  try {
+    const r = await manage.doctor({ cwd: process.cwd() });
+    for (const l of manage.formatDoctor(r)) process.stdout.write(`${l}\n`);
+    return r.ok ? 0 : 1;
+  } catch (e) {
+    process.stderr.write(`git-workflow guard: ${e.message}\n`);
+    return 1;
+  }
+}
+
 const COMMANDS = {
   hook,
   git: gitHook,
@@ -73,6 +84,9 @@ const COMMANDS = {
   uninstall: manageCmd(() => manage.uninstall()),
   enable: manageCmd((a) => manage.enable({ gitHooks: a.includes('--git-hooks') })),
   disable: manageCmd(() => manage.disable()),
+  doctor: doctorCmd,
+  repair: manageCmd(() => manage.repair()),
+  update: manageCmd(() => manage.update()),
 };
 
 const [sub, ...rest] = process.argv.slice(2);
