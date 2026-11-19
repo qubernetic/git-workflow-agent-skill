@@ -63,6 +63,8 @@ cd git-workflow-agent-skill
 .\scripts\install_windows.ps1 -Uninstall
 ```
 
+Uninstall removes the skill symlink and the agent hooks. It leaves the guard's user config and any per-repository git hooks in place. In each repository where you ran `enable --git-hooks`, delete `.git/hooks/commit-msg` and `.git/hooks/pre-push` (and rename any `<name>.local` hook back to `<name>`) before you delete the clone: those hooks call `hooks/guard.mjs` from the clone, so commits and pushes there fail once it is gone. `disable` does not remove them.
+
 ### Manual Installation
 
 If you prefer not to use the scripts:
@@ -108,14 +110,14 @@ Or invoke directly:
 
 ## Workflow Guard (optional)
 
-The skill relies on the agent following the rules. The guard is optional tooling in `hooks/` that checks the mechanical ones before a command runs: no AI attribution, Conventional Commits, no commits on `main`/`develop`, branch names and their issues, no force-push or `--no-verify`, `gh pr merge --merge` only, a human approval for merges into `main` and `develop`, and more (the full rule list is in the Enforcement section of `SKILL.md`). It needs `node` 20 or newer, has no dependencies, and fails open: if it cannot parse or query something, it allows the command and prints a warning.
+The skill relies on the agent following the rules. The guard is optional tooling in `hooks/` that checks the mechanical ones before a command runs: no AI attribution, Conventional Commits, no commits on `main`/`develop`, branch names and their issues, no plain force-push (`--force-with-lease` only on your own branches) or `--no-verify`, `gh pr merge --merge` only, a human approval for merges into `main` and `develop`, and more (the full rule list is in the Enforcement section of `SKILL.md`). It needs `node` 20 or newer, has no dependencies, and fails open: if it cannot parse or query something, it allows the command and prints a warning.
 
 ### Install
 
 The install scripts register the guard right after the skill symlink when `node` is found:
 
 ```bash
-./scripts/install_linux.sh                 # or install_macos.sh; skill + guard hooks
+./scripts/install_linux.sh                 # or install_macos.sh; skill + agent hooks
 ./scripts/install_linux.sh --scope all     # guard active in every repository
 ./scripts/install_linux.sh --no-hooks      # skill only
 ```
@@ -128,7 +130,7 @@ You can also ask Claude Code ("install the guard", "is the guard working?") or r
 
 ### Scope and per-repository config
 
-- `opt-in` (default): the guard is active only in repositories that contain a `.git-workflow.json`. Create it with `node hooks/guard.mjs enable` (add `--git-hooks` to install the `commit-msg` and `pre-push` git hooks too).
+- `opt-in` (default): the guard is active only in repositories that contain a `.git-workflow.json`. Create it by running, inside the target repository, `node /path/to/clone/hooks/guard.mjs enable` (add `--git-hooks` to install the `commit-msg` and `pre-push` git hooks too). `enable` acts on the repository of the current directory.
 - `all`: active in every repository.
 
 The scope lives in the user config (`$XDG_CONFIG_HOME/git-workflow-guard/config.json`, falling back to `~/.config/...`; on Windows `%APPDATA%\git-workflow-guard\config.json`). `.git-workflow.json` is optional settings, and `{}` is valid:
@@ -142,7 +144,7 @@ The scope lives in the user config (`$XDG_CONFIG_HOME/git-workflow-guard/config.
 }
 ```
 
-A rule level is one of `on`, `off`, `warn`, `ask`, `deny`.
+A rule level is one of `on`, `off`, `warn`, `ask`, `deny`. `on` keeps the rule's default decision (the same as leaving the rule out); `off` disables it; `warn`, `ask` and `deny` replace its decision. `ask` becomes `deny` where the agent cannot ask, such as in the git hooks.
 
 ### Harness support
 
