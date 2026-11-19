@@ -12,6 +12,8 @@ const baseState = {
   behindRemote: async () => 0,
   isAncestor: async () => true,
   showFile: async () => '## [1.5.0] - 2026-01-01\n',
+  branchExists: async () => false,
+  defaultBranch: async () => 'develop',
 };
 const ctx = (state = {}, config = {}) => ({
   state: { ...baseState, ...state },
@@ -23,9 +25,10 @@ const ids = async (line, c = ctx()) => (await evaluate([act(line)], c)).filter((
 
 test('branchCreation covers checkout/switch/branch/worktree and ignores the rest', () => {
   assert.deepEqual(branchCreation(act('git checkout -b feature/1-a develop')), { name: 'feature/1-a', startPoint: 'develop' });
-  assert.deepEqual(branchCreation(act('git checkout -B feature/1-a')), { name: 'feature/1-a', startPoint: null });
+  assert.deepEqual(branchCreation(act('git checkout -B feature/1-a')), { name: 'feature/1-a', startPoint: null, force: true });
   assert.deepEqual(branchCreation(act('git switch -c fix/2-b origin/develop')), { name: 'fix/2-b', startPoint: 'origin/develop' });
-  assert.deepEqual(branchCreation(act('git switch -C fix/2-b')), { name: 'fix/2-b', startPoint: null });
+  assert.deepEqual(branchCreation(act('git switch -C fix/2-b')), { name: 'fix/2-b', startPoint: null, force: true });
+  assert.deepEqual(branchCreation(act('git branch -f fix/2-b main')), { name: 'fix/2-b', startPoint: 'main', force: true });
   assert.deepEqual(branchCreation(act('git branch fix/2-b main')), { name: 'fix/2-b', startPoint: 'main' });
   assert.deepEqual(branchCreation(act('git worktree add -b fix/100-x ../wt develop')), { name: 'fix/100-x', startPoint: 'develop' });
   assert.equal(branchCreation(act('git branch -D fix/2-b')), null);
@@ -127,6 +130,37 @@ test('names starting with a dash never reach state methods', async () => {
   calls.length = 0;
   assert.deepEqual(await ids('git checkout -b -x', c), ['branch-name:deny']);
   assert.deepEqual(calls.filter((x) => x[0] === 'issue'), []);
+});
+
+test('resetting an existing or protected branch is not a creation', async () => {
+  const calls = [];
+  const st = (exists) => ctx({
+    branchExists: async (n) => { calls.push(n); return exists; },
+    issueState: async () => 'MISSING',
+    behindRemote: async () => 4,
+    currentBranch: async () => 'develop',
+  });
+  for (const line of ['git branch -f develop origin/develop', 'git checkout -B develop origin/develop', 'git switch -C main origin/main',
+    'git switch --force-create main origin/main']) {
+    assert.deepEqual(await ids(line, st(false)), [], line);
+  }
+  for (const line of ['git checkout -B feature/9-x develop', 'git branch -f foo HEAD', 'git switch -C feature/9-x']) {
+    assert.deepEqual(await ids(line, st(true)), [], line);
+    assert.deepEqual(await ids(line, st(null)), [], line);
+  }
+  assert.ok(calls.includes('foo'));
+  assert.deepEqual(await ids('git checkout -B foo develop', st(false)), ['branch-name:deny', 'fresh-base:deny']);
+  assert.deepEqual(await ids('git checkout -B feature/9-x', st(false)), ['branch-issue:deny', 'fresh-base:deny']);
+  assert.deepEqual(await ids('git checkout -b develop', st(true)), ['branch-name:deny', 'fresh-base:deny']);
+});
+
+test('pr-base without --base uses the repository default branch', async () => {
+  const repos = [];
+  const cfg = (head, def) => ctx({ currentBranch: async () => head, defaultBranch: async (r) => { repos.push(r); return def; } });
+  assert.deepEqual(await ids('gh pr create', cfg('feature/9-x', 'main')), ['pr-base:deny']);
+  assert.deepEqual(await ids('gh pr create', cfg('feature/9-x', null)), []);
+  assert.deepEqual(await ids('gh pr create', cfg('hotfix/9-x', 'main')), []);
+  assert.deepEqual(repos, [undefined, undefined, undefined]);
 });
 
 test('pr-base', async () => {

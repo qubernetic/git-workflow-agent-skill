@@ -24,25 +24,41 @@ const NOT_CREATE = ['d', 'D', 'delete', 'm', 'M', 'move', 'c', 'C', 'copy', 'l',
   'u', 'set-upstream-to', 'unset-upstream', 'contains', 'no-contains', 'merged', 'no-merged', 'points-at',
   'show-current', 'v', 'vv', 'verbose', 'edit-description'];
 
-// -> {name, startPoint}|null for commands that create a new branch.
+// -> {name, startPoint, force?}|null for commands that create a new branch.
+// force: -B/-C/--force-create/branch -f, which may also reset an existing branch.
 export function branchCreation(a) {
   if (a.tool !== 'git') return null;
   const flag = (...keys) => keys.map((k) => str(a.flags.get(k))).find((v) => v !== null) ?? null;
   const at = (i) => a.positionals[i] ?? null;
   let name = null;
   let start = null;
+  let force = false;
   if (a.sub === 'checkout' || a.sub === 'switch') {
     name = a.sub === 'checkout' ? flag('b', 'B') : flag('c', 'C', 'create', 'force-create');
+    force = name !== null && name === (a.sub === 'checkout' ? flag('B') : flag('C', 'force-create'));
     start = at(0);
   } else if (a.sub === 'branch') {
     if (NOT_CREATE.some((k) => a.flags.has(k))) return null;
     name = at(0);
     start = at(1);
+    force = a.flags.has('f') || a.flags.has('force');
   } else if (a.sub === 'worktree' && a.positionals[0] === 'add') {
     name = flag('b', 'B');
+    force = name !== null && name === flag('B');
     start = at(2);
   }
-  return name ? { name, startPoint: start } : null;
+  if (!name) return null;
+  return force ? { name, startPoint: start, force } : { name, startPoint: start };
+}
+
+// branchCreation, minus forced resets of a protected or existing local branch.
+// Unknown existence (null) counts as a reset: never deny on doubt.
+async function newBranch(a, ctx) {
+  const c = branchCreation(a);
+  if (!c || !c.force) return c;
+  if (protectedOf(ctx).includes(c.name)) return null;
+  const exists = await ctx.state.branchExists?.(c.name);
+  return exists === false ? c : null;
 }
 
 const matchesProtected = (name, ctx) => protectedOf(ctx).includes(name) || /^epic\/./.test(name);
@@ -118,8 +134,10 @@ const validName = (name, ctx) => nameRe(ctx).test(name) || RELEASE_NAME.test(nam
 const branchName = {
   id: 'branch-name',
   applies: (a) => branchCreation(a) !== null,
-  check(a, ctx) {
-    const { name } = branchCreation(a);
+  async check(a, ctx) {
+    const c = await newBranch(a, ctx);
+    if (!c) return null;
+    const { name } = c;
     if (validName(name, ctx)) return null;
     return finding('branch-name', `branch name "${name}" is invalid`,
       `Use <type>/<issue>-<slug> with type one of ${typesOf(ctx).join(', ')} (e.g. feature/12-add-login), or release/X.Y.Z`);
@@ -130,7 +148,9 @@ const branchIssue = {
   id: 'branch-issue',
   applies: (a) => branchCreation(a) !== null,
   async check(a, ctx) {
-    const { name } = branchCreation(a);
+    const c = await newBranch(a, ctx);
+    if (!c) return null;
+    const { name } = c;
     if (isOption(name) || RELEASE_NAME.test(name) || !nameRe(ctx).test(name)) return null;
     const n = Number.parseInt(name.split('/')[1], 10);
     const state = await ctx.state.issueState(n);
@@ -144,7 +164,9 @@ const freshBase = {
   id: 'fresh-base',
   applies: (a) => branchCreation(a) !== null,
   async check(a, ctx) {
-    const { startPoint } = branchCreation(a);
+    const c = await newBranch(a, ctx);
+    if (!c) return null;
+    const { startPoint } = c;
     const base = startPoint ?? await ctx.state.currentBranch();
     if (!base || isOption(base) || base.startsWith('origin/')) return null;
     if (!(matchesProtected(base, ctx) || /^release\/./.test(base))) return null;
@@ -169,12 +191,16 @@ const prBase = {
   async check(a, ctx) {
     const baseFlag = a.flags.get('base');
     if (baseFlag === true) return null;
-    const base = baseFlag ?? 'develop';
     const headFlag = a.flags.get('head');
     const head = typeof headFlag === 'string' ? headFlag.replace(/^.*:/, '') : await ctx.state.currentBranch();
     if (!head) return null;
     const rule = EXPECTED_BASE[head.split('/')[0]];
-    if (!rule || rule[1](base)) return null;
+    if (!rule) return null;
+    // Without --base, gh targets the repository's default branch.
+    const repo = a.flags.get('repo');
+    const base = baseFlag ?? await ctx.state.defaultBranch?.(typeof repo === 'string' ? repo : undefined);
+    if (typeof base !== 'string' || !base) return null;
+    if (rule[1](base)) return null;
     return finding('pr-base', `a PR from ${head} must not target ${base}`, `Use --base ${rule[0]}`);
   },
 };
