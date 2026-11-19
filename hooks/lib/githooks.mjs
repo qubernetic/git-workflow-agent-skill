@@ -77,7 +77,7 @@ export function prePush(stdinText, { cwd = process.cwd() } = {}) {
           continue;
         }
       }
-      findings.push(finding(config, 'protected-push', `pushing directly to ${branch} is not allowed`, 'Push a feature/fix branch and open a PR instead'));
+      findings.push(finding(config, 'protected-commit', `pushing directly to ${branch} is not allowed`, 'Push a feature/fix branch and open a PR instead'));
     }
     return verdict(findings.filter(Boolean), warnings);
   } catch (e) {

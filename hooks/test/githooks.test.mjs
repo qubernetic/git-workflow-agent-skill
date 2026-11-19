@@ -90,7 +90,18 @@ test('prePush denies direct push to a protected branch', () => {
   const sha = git(dir, 'rev-parse', 'HEAD').out;
   const r = prePush(`refs/heads/develop ${sha} refs/heads/develop ${sha}\n`, { cwd: dir });
   assert.equal(r.exitCode, 1);
+  assert.match(r.stderr, /protected-commit/);
   assert.match(r.stderr, /develop/);
+});
+
+test('protected-commit level governs pre-push direct pushes', () => {
+  const sha = (d) => git(d, 'rev-parse', 'HEAD').out;
+  const offDir = makeRepo({ commits: 3, config: { rules: { 'protected-commit': 'off' } } });
+  assert.equal(prePush(`refs/heads/develop ${sha(offDir)} refs/heads/develop ${sha(offDir)}\n`, { cwd: offDir }).exitCode, 0);
+  const warnDir = makeRepo({ commits: 3, config: { rules: { 'protected-commit': 'warn' } } });
+  const w = prePush(`refs/heads/develop ${sha(warnDir)} refs/heads/develop ${sha(warnDir)}\n`, { cwd: warnDir });
+  assert.equal(w.exitCode, 0);
+  assert.match(w.stderr, /protected-commit/);
 });
 
 test('prePush allows bootstrap push of a single-commit repo to a new protected ref', () => {
