@@ -104,11 +104,19 @@ const conventionalTitle = {
     const title = a.texts.title.trim();
     const problem = subjectProblem(title);
     if (problem) return ruleFinding('conventional-title', problem);
-    if (!isPr(a) || a.sub !== 'pr create') return null;
-    const head = a.flags.get('head') ?? (await ctx.state.currentBranch());
+    if (!isPr(a)) return null;
+    let head;
+    let base = a.flags.get('base');
+    if (a.sub === 'pr create') {
+      head = a.flags.get('head') ?? (await ctx.state.currentBranch());
+    } else {
+      const view = await ctx.state.prView(a.positionals[0]);
+      head = view?.headRefName;
+      if (typeof base !== 'string') base = view?.baseRefName;
+    }
     if (typeof head !== 'string' || !head) return null;
     if (/^(release|hotfix)\//.test(head)) return null;
-    if (head === 'main' && a.flags.get('base') === 'develop') return null;
+    if (head === 'main' && base === 'develop') return null;
     if (!/( \(#\d+\))+$/.test(title)) {
       return finding('conventional-title', `PR title "${title}" lacks the issue suffix`,
         'End it with " (#N)" for the issue number, e.g. "feat: add search (#9)"');

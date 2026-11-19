@@ -86,3 +86,19 @@ test('checkCommitMessage is shared and applies config', () => {
 test('RULES ids', () => {
   assert.deepEqual(RULES.map((r) => r.id), ['no-ai-attribution', 'conventional-commit', 'conventional-title', 'closes-one-per-line']);
 });
+
+const editCtx = (view) => ({ ...ctx(), state: { currentBranch: async () => 'x', prView: async () => view } });
+const edit = (title, positionals = []) => ({ ...pr({ title }, {}, 'pr edit'), positionals });
+test('pr edit checks the (#N) suffix using prView head', async () => {
+  const v = { headRefName: 'feature/9-x', baseRefName: 'develop' };
+  assert.deepEqual(await one(edit('feat: x'), editCtx(v)), ['conventional-title', 'deny']);
+  assert.equal(await one(edit('feat: x (#9)', ['12']), editCtx(v)), null);
+});
+test('pr edit fails open on suffix when prView is unknown, still checks subject', async () => {
+  assert.equal(await one(edit('feat: x'), editCtx(null)), null);
+  assert.equal(await one(edit('feat: x'), editCtx({})), null);
+  assert.deepEqual(await one(edit('nope'), editCtx(null)), ['conventional-title', 'deny']);
+});
+test('pr edit exempts release head', async () => {
+  assert.equal(await one(edit('chore(release): prepare 1.5.0'), editCtx({ headRefName: 'release/1.5.0', baseRefName: 'main' })), null);
+});
