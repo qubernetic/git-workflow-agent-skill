@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { userConfigPath, findRepoRoot, loadConfig } from '../config.mjs';
 import { installShims } from '../githooks.mjs';
-import { HARNESSES, register, unregister, codexHome, ourEntries } from './registry.mjs';
+import { HARNESSES, register, unregister, codexHome, ourEntries, writeFileThrough } from './registry.mjs';
 import { defaultExec } from '../state.mjs';
 
 const GUARD_PATH = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../guard.mjs');
@@ -44,11 +44,12 @@ export function install({ scope = 'opt-in', harnesses, env = process.env } = {})
     }
   }
   const file = userConfigPath(env);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
   const cfg = { scope, version: skillVersion(), guardPath: GUARD_PATH, harnesses: registered };
-  fs.writeFileSync(`${file}.tmp`, `${JSON.stringify(cfg, null, 2)}\n`);
-  fs.renameSync(`${file}.tmp`, file);
+  writeFileThrough(file, `${JSON.stringify(cfg, null, 2)}\n`);
   lines.push(`user config written to ${file} (scope: ${scope})`);
+  if (scope === 'opt-in') {
+    lines.push(`to enable the guard in a repository, run there: node "${GUARD_PATH}" enable [--git-hooks]`);
+  }
   return lines;
 }
 
@@ -256,11 +257,14 @@ export function repair({ env = process.env } = {}) {
     }
   }
   const user = readUserConfig(env);
+  if (!user.value && !user.missing) {
+    // Keep the user's broken file: a typo must not silently reset scope or other settings.
+    fs.copyFileSync(user.file, `${user.file}.bak`);
+    lines.push(`invalid user config ${user.file} (${user.error}) backed up to ${user.file}.bak`);
+  }
   const base = user.value ?? {};
   const cfg = { ...base, scope: base.scope === 'all' ? 'all' : 'opt-in', version: skillVersion(), guardPath: GUARD_PATH, harnesses: [...new Set([...(base.harnesses ?? []), ...registered])] };
-  fs.mkdirSync(path.dirname(user.file), { recursive: true });
-  fs.writeFileSync(`${user.file}.tmp`, `${JSON.stringify(cfg, null, 2)}\n`);
-  fs.renameSync(`${user.file}.tmp`, user.file);
+  writeFileThrough(user.file, `${JSON.stringify(cfg, null, 2)}\n`);
   lines.push(`user config rewritten at ${user.file} (version ${cfg.version})`);
   return lines;
 }

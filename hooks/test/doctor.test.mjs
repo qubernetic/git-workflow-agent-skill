@@ -62,6 +62,19 @@ test('registered path pointing to a deleted file fails claude-path; repair fixes
   assert.ok(after.hooks.PreToolUse.some((e) => e.hooks[0].command === 'echo foreign'), 'foreign entry kept');
 });
 
+test('repair backs up an invalid user config before rewriting it', () => {
+  const env = makeEnv();
+  install({ scope: 'all', env });
+  const file = userConfigPath(env);
+  fs.writeFileSync(file, '{"scope": "all",');
+  const lines = repair({ env });
+  assert.equal(fs.readFileSync(`${file}.bak`, 'utf8'), '{"scope": "all",');
+  assert.ok(lines.some((l) => l.includes(`${file}.bak`)), lines.join('\n'));
+  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).version, '1.4.0');
+  const again = repair({ env });
+  assert.ok(!again.some((l) => l.includes('.bak')));
+});
+
 test('stale user config version fails version; repair rewrites it', async () => {
   const env = makeEnv();
   install({ env });
@@ -132,13 +145,19 @@ test('repo checks: git hook shims are a warning only', async () => {
   fs.mkdirSync(repo);
   git(repo, 'init', '-b', 'main');
   fs.writeFileSync(path.join(repo, '.git-workflow.json'), '{}');
-  let r = await doctor({ cwd: repo, env });
+  const calls = [];
+  const exec = async (cmd, args) => {
+    calls.push([cmd, ...args].join(' '));
+    return cmd === 'git' ? { code: 0, stdout: '.git/hooks\n', stderr: '' } : { code: 0, stdout: '', stderr: '' };
+  };
+  let r = await doctor({ cwd: repo, env, exec });
   assert.equal(byId(r, 'repo-active').ok, true);
   assert.equal(byId(r, 'repo-config').ok, true);
   assert.equal(byId(r, 'repo-git-hooks').ok, false);
   assert.equal(r.ok, true, 'warnings do not fail');
+  assert.ok(calls.includes('git rev-parse --git-path hooks') && calls.includes('gh auth status'), calls.join('; '));
   fs.writeFileSync(path.join(repo, '.git-workflow.json'), '{nope');
-  r = await doctor({ cwd: repo, env });
+  r = await doctor({ cwd: repo, env, exec });
   assert.equal(byId(r, 'repo-config').ok, false);
   assert.equal(r.ok, false);
 });

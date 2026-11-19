@@ -73,6 +73,12 @@ test('codex: shell array gh pr merge --squash denied', async () => {
   assert.match(decision(r).permissionDecisionReason, /merge-method/);
 });
 
+test('codex: Bash tool with a string command (real payload shape) is denied', async () => {
+  const r = await codex.preToolUse(fixture('codex-bash-merge.json'), { env, exec });
+  assert.equal(JSON.parse(r.stdout).hookSpecificOutput.permissionDecision, 'deny');
+  assert.match(JSON.parse(r.stdout).hookSpecificOutput.permissionDecisionReason, /merge-method/);
+});
+
 test('codex: never asks', async () => {
   const r = await codex.preToolUse({ cwd: repo, tool_name: 'shell', tool_input: { command: 'gh pr merge 5 --merge' } }, { env, exec });
   assert.equal(decision(r).permissionDecision, 'deny');

@@ -23,7 +23,7 @@ export const HARNESSES = {
     detect: (env) => fs.existsSync(codexHome(env)),
     configPath: (env) => path.join(codexHome(env), 'hooks.json'),
     events: {
-      PreToolUse: { matcher: 'shell|shell_command|exec_command|local_shell|ctx_execute|ctx_batch(_execute)?', command: 'hook codex pre-tool-use' },
+      PreToolUse: { matcher: 'Bash|shell|shell_command|exec_command|local_shell|ctx_execute|ctx_batch(_execute)?', command: 'hook codex pre-tool-use' },
       SessionStart: { command: 'hook codex session-start' },
     },
   },
@@ -48,16 +48,38 @@ function readConfig(file) {
   return value;
 }
 
-function writeConfig(file, cfg) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, `${JSON.stringify(cfg, null, 2)}\n`);
-  fs.renameSync(tmp, file);
+// tmp+rename next to the real file: a symlink (stow, chezmoi) stays a symlink and the
+// existing file mode is kept.
+export function writeFileThrough(file, text) {
+  let target = file;
+  let mode;
+  try {
+    target = fs.realpathSync(file);
+    mode = fs.statSync(target).mode & 0o7777;
+  } catch (e) {
+    if (e.code !== 'ENOENT') throw e;
+    target = file;
+  }
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  const tmp = `${target}.tmp`;
+  fs.writeFileSync(tmp, text, mode === undefined ? undefined : { mode });
+  if (mode !== undefined) fs.chmodSync(tmp, mode);
+  fs.renameSync(tmp, target);
+}
+
+const writeConfig = (file, cfg) => writeFileThrough(file, `${JSON.stringify(cfg, null, 2)}\n`);
+
+// A present but non-array hooks.<Event> is the user's data: refuse instead of replacing it.
+function assertEventLists(file, cfg, events) {
+  for (const event of events) {
+    const v = cfg.hooks?.[event];
+    if (v !== undefined && !Array.isArray(v)) throw new Error(`${file}: "hooks.${event}" is not an array`);
+  }
 }
 
 const entryFor = (spec, guardPath) => {
   const e = spec.matcher === undefined ? {} : { matcher: spec.matcher };
-  e.hooks = [{ type: 'command', command: `node "${guardPath}" ${spec.command}`, timeout: 10 }];
+  e.hooks = [{ type: 'command', command: `node "${guardPath}" ${spec.command}`, timeout: 30 }];
   return e;
 };
 
@@ -65,6 +87,7 @@ export function register(harness, guardPath, env = process.env) {
   const h = HARNESSES[harness];
   const file = h.configPath(env);
   const cfg = readConfig(file);
+  assertEventLists(file, cfg, Object.keys(h.events));
   const before = JSON.stringify(cfg);
   cfg.hooks ??= {};
   for (const [event, spec] of Object.entries(h.events)) {
@@ -86,6 +109,7 @@ export function unregister(harness, env = process.env) {
   const file = HARNESSES[harness].configPath(env);
   if (!fs.existsSync(file)) return { changed: false };
   const cfg = readConfig(file);
+  assertEventLists(file, cfg, Object.keys(HARNESSES[harness].events));
   let changed = false;
   for (const [event, list] of Object.entries(cfg.hooks ?? {})) {
     if (!Array.isArray(list)) continue;

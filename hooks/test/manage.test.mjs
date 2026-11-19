@@ -38,7 +38,7 @@ test('register keeps foreign entries, adds ours, is idempotent', () => {
   assert.equal(cfg.hooks.PreToolUse.length, 2);
   const ours = cfg.hooks.PreToolUse[1];
   assert.equal(ours.matcher, 'Bash|mcp__.*ctx_execute|mcp__.*ctx_batch(_execute)?');
-  assert.deepEqual(ours.hooks, [{ type: 'command', command: `node "${GUARD}" hook claude pre-tool-use`, timeout: 10 }]);
+  assert.deepEqual(ours.hooks, [{ type: 'command', command: `node "${GUARD}" hook claude pre-tool-use`, timeout: 30 }]);
   assert.equal('matcher' in cfg.hooks.SessionStart[1], false);
   assert.equal(register('claude', GUARD, env).changed, false);
 });
@@ -50,7 +50,38 @@ test('register with a new path replaces our entry', () => {
   const cfg = readJson(HARNESSES.codex.configPath(env));
   assert.equal(cfg.hooks.PreToolUse.length, 1);
   assert.match(cfg.hooks.PreToolUse[0].hooks[0].command, /other\/guard\.mjs" hook codex pre-tool-use/);
-  assert.equal(cfg.hooks.PreToolUse[0].matcher, 'shell|shell_command|exec_command|local_shell|ctx_execute|ctx_batch(_execute)?');
+  assert.equal(cfg.hooks.PreToolUse[0].matcher, 'Bash|shell|shell_command|exec_command|local_shell|ctx_execute|ctx_batch(_execute)?');
+  assert.equal(cfg.hooks.PreToolUse[0].hooks[0].timeout, 30);
+});
+
+test('register and unregister refuse a non-array hooks.<Event> and leave the file untouched', () => {
+  const env = makeEnv();
+  const file = HARNESSES.claude.configPath(env);
+  for (const bad of [{ PreToolUse: { matcher: 'Bash' } }, { SessionStart: 'x' }, { PreToolUse: null }]) {
+    const text = JSON.stringify({ hooks: bad });
+    fs.writeFileSync(file, text);
+    assert.throws(() => register('claude', GUARD, env), /not an array/);
+    assert.throws(() => unregister('claude', env), /not an array/);
+    assert.equal(fs.readFileSync(file, 'utf8'), text);
+  }
+  const lines = install({ env, harnesses: ['claude'] });
+  assert.ok(lines.some((l) => /^claude: error: .*not an array.*left untouched/.test(l)), lines.join('\n'));
+});
+
+test('register writes through a symlinked settings file and keeps its mode', { skip: process.platform === 'win32' }, () => {
+  const env = makeEnv();
+  const file = HARNESSES.claude.configPath(env);
+  const real = path.join(env.HOME, 'dotfiles-settings.json');
+  fs.writeFileSync(real, JSON.stringify({ theme: 'dark' }), { mode: 0o600 });
+  fs.chmodSync(real, 0o600);
+  fs.symlinkSync(real, file);
+  assert.equal(register('claude', GUARD, env).changed, true);
+  assert.equal(fs.lstatSync(file).isSymbolicLink(), true);
+  assert.equal(readJson(real).theme, 'dark');
+  assert.ok(readJson(real).hooks.PreToolUse);
+  assert.equal(fs.statSync(real).mode & 0o777, 0o600);
+  assert.equal(unregister('claude', env).changed, true);
+  assert.equal(fs.lstatSync(file).isSymbolicLink(), true);
 });
 
 test('unregister removes only ours', () => {
@@ -86,6 +117,27 @@ test('install writes user config, registers detected harnesses, hints codex feat
   assert.ok(lines.some((l) => /hooks = true/.test(l)));
   fs.writeFileSync(path.join(env.CODEX_HOME, 'config.toml'), '[features]\nhooks = true\n');
   assert.ok(!install({ env }).some((l) => /hooks = true/.test(l)));
+});
+
+test('install with opt-in prints how to enable a repository', () => {
+  const env = makeEnv({ codex: false });
+  const lines = install({ env });
+  assert.ok(lines.some((l) => /guard\.mjs" enable( \[--git-hooks\])?/.test(l) && /repositor/.test(l)), lines.join('\n'));
+  assert.ok(!install({ scope: 'all', env }).some((l) => /" enable/.test(l)));
+});
+
+test('install writes a symlinked user config through the link', { skip: process.platform === 'win32' }, () => {
+  const env = makeEnv({ codex: false });
+  const file = userConfigPath(env);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const real = path.join(env.HOME, 'real-config.json');
+  fs.writeFileSync(real, '{}', { mode: 0o640 });
+  fs.chmodSync(real, 0o640);
+  fs.symlinkSync(real, file);
+  install({ scope: 'all', env });
+  assert.equal(fs.lstatSync(file).isSymbolicLink(), true);
+  assert.equal(readJson(real).scope, 'all');
+  assert.equal(fs.statSync(real).mode & 0o777, 0o640);
 });
 
 test('install skips undetected harnesses and honours scope/harnesses', () => {
