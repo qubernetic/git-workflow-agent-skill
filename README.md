@@ -167,7 +167,7 @@ A rule level is one of `on`, `off`, `warn`, `ask`, `deny`. `on` keeps the rule's
 | Windows + Claude Code (Git Bash) | yes | automated suite (2 symlink tests skipped) and manual run on one Windows VM; git-hook shims checked over SSH |
 | Windows + Codex CLI | **no** | |
 | Windows PowerShell commands (agent's PowerShell tool) | **no** | not guarded yet, planned |
-| Windows install script (`install_windows.ps1`) | **no** | not executed; the VM test called `guard.mjs install` directly |
+| Windows install script (`install_windows.ps1`) | yes | Windows PowerShell 5.1 and PowerShell 7 on one Windows VM (install, re-run, `-NoHooks`, `-Uninstall`) |
 | macOS (any harness, `install_macos.sh`) | CI only | automated suite passes on `macos-latest`; no manual run with a harness, install script only syntax-checked |
 | Node 20 (minimum) | CI only | the CI matrix runs Node 20; local and manual runs used Node 26 |
 | Copilot CLI, Gemini CLI, Cursor | **no** | no adapter yet |
