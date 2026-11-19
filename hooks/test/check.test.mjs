@@ -16,7 +16,7 @@ const mkRepo = (name, optIn = true) => {
   return dir;
 };
 const repo = mkRepo('repo');
-const env = { XDG_CONFIG_HOME: xdg, HOME: tmp };
+const env = { XDG_CONFIG_HOME: xdg, APPDATA: xdg, HOME: tmp, USERPROFILE: tmp };
 
 const spy = (impl) => {
   const calls = [];

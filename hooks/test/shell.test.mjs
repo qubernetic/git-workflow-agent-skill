@@ -175,3 +175,12 @@ test('cd to a Git Bash drive path maps to the drive on win32 only', () => {
   const l = parseCommandLine('cd /c/Users/x && git status', { cwd: '/r', platform: 'linux' });
   assert.equal(l.commands[1].cwd, '/c/Users/x');
 });
+
+test('cd to a Cygwin drive path maps to the drive on win32 only', () => {
+  const w = parseCommandLine('cd /cygdrive/c/Users/x && git status; cd /cygdrive/d && git log; cd /cygdrive && git log', { cwd: 'C:\\r', platform: 'win32' });
+  assert.equal(w.commands[1].cwd, 'C:/Users/x');
+  assert.equal(w.commands[3].cwd, 'D:/');
+  assert.notEqual(w.commands[5].cwd, 'C:/');
+  const l = parseCommandLine('cd /cygdrive/c/Users/x && git status', { cwd: '/r', platform: 'linux' });
+  assert.equal(l.commands[1].cwd, '/cygdrive/c/Users/x');
+});

@@ -1,11 +1,11 @@
 ---
 name: git-workflow
 description: "Enforce a strict Gitflow-based workflow with conventional commits, semantic versioning, and issue-driven branching, including epic branches for multi-slice work. Use when the user asks to commit, create a branch, open a PR, tag a release, plan an epic, or perform any git operation. Also applies when mentions 'commit', 'branch', 'merge', 'rebase', 'force-push', 'release', 'hotfix', 'epic', 'slice', 'gitflow', 'conventional commit', 'semantic versioning', or 'semver'."
-version: 1.5.0
+version: 1.6.0
 license: MIT
 metadata:
   author: Qubernetic
-  version: 1.5.0
+  version: 1.6.0
 ---
 
 # Git Workflow Skill
@@ -44,7 +44,7 @@ Enforce a disciplined Gitflow-based development workflow. Every git operation fo
 | Branch | Purpose | Merge via |
 |--------|---------|-----------|
 | `main` | Production-ready code | PR only (from `release/*` or `hotfix/*`) |
-| `develop` | Integration branch for next release | PR only (from `feature/*`, `fix/*` or `epic/*`) |
+| `develop` | Integration branch for next release | PR only (from `feature/*`, `fix/*`, `docs/*`, `ci/*`, `perf/*` or `epic/*`) |
 
 ### Working Branches
 
@@ -52,11 +52,16 @@ Enforce a disciplined Gitflow-based development workflow. Every git operation fo
 |---------|-------------|-------------|---------|
 | `feature/<issue>-<slug>` | `develop` | `develop` | New features |
 | `fix/<issue>-<slug>` | `develop` | `develop` | Bug fixes on develop |
+| `docs/<issue>-<slug>` | `develop` | `develop` | Documentation-only changes (`docs` commits) |
+| `ci/<issue>-<slug>` | `develop` | `develop` | CI pipeline changes (`ci` commits) |
+| `perf/<issue>-<slug>` | `develop` | `develop` | Performance improvements (`perf` commits) |
 | `hotfix/<issue>-<slug>` | `main` | `main` AND `develop` | Urgent production fixes |
 | `release/<version>` | `develop` | `main` AND `develop` | Release preparation |
 | `epic/<issue>-<slug>` | `develop` | `develop` | Integration branch for a plan of two or more slices (see [Epics](#epics)) |
 
-A slice of an epic is an ordinary `feature/*` or `fix/*` branch whose base and merge target is the epic branch instead of `develop`.
+`docs/*`, `ci/*` and `perf/*` are for changes made of that one commit type. A feature or fix that also touches docs or CI stays on `feature/*` or `fix/*`.
+
+A slice of an epic is an ordinary working branch (`feature/*`, `fix/*`, `docs/*`, `ci/*` or `perf/*`) whose base and merge target is the epic branch instead of `develop`.
 
 ### Sync Before Branching
 
@@ -68,7 +73,7 @@ git pull origin develop          # ← mandatory before branching
 git checkout -b feature/42-slug
 ```
 
-This applies to every branch type: `feature/*`, `fix/*` and `epic/*` pull `develop`, `hotfix/*` pulls `main`, `release/*` pulls `develop`. A slice of an epic pulls its epic branch (`git pull origin epic/<issue>-<slug>`).
+This applies to every branch type: `feature/*`, `fix/*`, `docs/*`, `ci/*`, `perf/*` and `epic/*` pull `develop`, `hotfix/*` pulls `main`, `release/*` pulls `develop`. A slice of an epic pulls its epic branch (`git pull origin epic/<issue>-<slug>`).
 
 ### Merge Strategy
 
@@ -128,10 +133,10 @@ git push --force-with-lease origin <each-rewritten-branch>
 ### Branch Naming Convention
 
 - Always lowercase, hyphen-separated
-- Working branches (`feature/*`, `fix/*`, `hotfix/*`) are prefixed with the issue number
+- Working branches (`feature/*`, `fix/*`, `docs/*`, `ci/*`, `perf/*`, `hotfix/*`) are prefixed with the issue number
 - Release branches use version number only: `release/<version>`
 - Epic branches use the number of the dedicated epic issue: `epic/<epic-issue>-<slug>`
-- Examples: `feature/42-add-search`, `fix/17-broken-navbar`, `hotfix/89-auth-crash`, `release/1.2.0`, `epic/34-pre-alpha`
+- Examples: `feature/42-add-search`, `fix/17-broken-navbar`, `docs/51-api-guide`, `ci/52-cache-deps`, `perf/53-lazy-load`, `hotfix/89-auth-crash`, `release/1.2.0`, `epic/34-pre-alpha`
 
 ---
 
@@ -232,11 +237,27 @@ Branch deleted (remote + local)
 
 1. **Every branch starts from a GitHub Issue** — no branch without an issue, including releases (create a lightweight issue titled `chore(release): prepare 1.2.0` with `chore` label)
 2. **Issue title** follows Conventional Commits format without the `(#<issue>)` suffix — e.g., `fix(auth): login fails on expired token`
-3. **One PR per issue** — the PR closes exactly one issue (exception: an epic PR, which closes the epic and lists its slices — see [Epics](#epics))
+3. **One PR per issue** — the PR closes exactly one issue (exceptions: an epic PR, which closes the epic and lists its slices — see [Epics](#epics); a [small-issue bundle](#small-issue-bundles))
 4. **PR title** follows Conventional Commits format: `<type>(<scope>): <description> (#<issue>)` — e.g., `feat(auth): add OAuth2 login flow (#42)`
 5. **PR body** references the issue: `Closes #42`
 6. **Test plan verified before merge** — check off each item (`- [x]`) in the PR description as it passes. This makes test progress visible to reviewers and serves as an audit trail.
 7. **Branch is deleted** after merge — both remote (enable GitHub's "Automatically delete head branches") and local (`git fetch --prune && git branch -d <branch>`)
+
+### Small-Issue Bundles
+
+Two or three small, closely related issues may share one branch and one PR when all of these hold:
+
+- **Same area**: they belong to the same feature area or command group
+- **Small**: each is roughly 30 minutes of work or less
+- **Independent of other work**: no dependency on issues outside the bundle
+- **Reviewed together anyway**: none of them has value on its own that a separate review would protect
+
+If any issue could reasonably be reviewed on its own, keep it separate. More than three issues, or anything that is not small, is an [epic](#epics).
+
+- **Branch**: named after the lowest-numbered issue, with that issue's type: `feature/22-org-commands`
+- **Commits**: each issue gets its own atomic commit(s); never mix two issues in one commit
+- **PR title**: Conventional Commits with the branch's issue number: `feat(cli): add org, notification and completion commands (#22)`
+- **PR body**: one short section per issue saying what it contributes, then one `Closes #N` line per issue
 
 ### GitHub Auto-Close Limitation
 
@@ -723,10 +744,14 @@ Deliberate recovery on a shared branch (the force-push and secret-purge procedur
 |-----------|-------------|------|
 | New feature | `feature/*` | `develop` |
 | Bug found during development | `fix/*` | `develop` |
+| Documentation only | `docs/*` | `develop` |
+| CI pipeline only | `ci/*` | `develop` |
+| Performance improvement | `perf/*` | `develop` |
 | Bug found in production | `hotfix/*` | `main` |
 | Preparing a release | `release/*` | `develop` |
 | Plan with two or more slices | `epic/*` | `develop` |
-| Slice of an open epic | `feature/*` or `fix/*` | the epic branch |
+| Slice of an open epic | `feature/*`, `fix/*`, `docs/*`, `ci/*` or `perf/*` | the epic branch |
+| Two or three small, related issues ([bundle](#small-issue-bundles)) | type of the lowest-numbered issue, named after it | `develop` |
 
 ### "What commit type do I use?"
 

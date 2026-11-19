@@ -3,7 +3,7 @@
 # Git Workflow — Claude Code Skill
 
 [![Lint](https://github.com/qubernetic/git-workflow-agent-skill/actions/workflows/lint.yml/badge.svg)](https://github.com/qubernetic/git-workflow-agent-skill/actions/workflows/lint.yml)
-[![Version](https://img.shields.io/badge/version-1.5.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.6.0-blue.svg)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-skill-7c3aed.svg)](https://claude.ai/code)
 [![Conventional Commits](https://img.shields.io/badge/commits-conventional-fe5196.svg?logo=conventionalcommits&logoColor=white)](https://conventionalcommits.org)
@@ -97,7 +97,7 @@ Or invoke directly:
 
 | Rule | Description |
 |------|-------------|
-| **Gitflow branching** | `main`, `develop`, `feature/*`, `fix/*`, `hotfix/*`, `release/*`, `epic/*` |
+| **Gitflow branching** | `main`, `develop`, `feature/*`, `fix/*`, `docs/*`, `ci/*`, `perf/*`, `hotfix/*`, `release/*`, `epic/*` |
 | **Epics** | Multi-slice plans run on an `epic/*` branch; slices merge freely, one reviewed epic PR reaches `develop` |
 | **Conventional Commits** | Structured messages — `feat:`, `fix:`, `docs:`, `chore:`, etc. |
 | **Atomic commits** | One logical change per commit, no mixed concerns |
@@ -126,7 +126,7 @@ The install scripts register the guard right after the skill symlink when `node`
 .\scripts\install_windows.ps1 -Scope all   # -NoHooks and -Uninstall work too
 ```
 
-You can also ask Claude Code ("install the guard", "is the guard working?") or run the guard directly: `node hooks/guard.mjs install|update|doctor|repair|uninstall|enable|disable`. `install` accepts `--scope opt-in|all` and `--harness claude,codex`. Re-running `install` without `--scope` keeps the scope you chose earlier. Run `doctor` to check the registration.
+You can also ask Claude Code ("install the guard", "is the guard working?") or run the guard directly: `node /path/to/clone/hooks/guard.mjs install|update|doctor|repair|uninstall|enable|disable` (use the absolute path; `install` prints it, and `enable`/`disable` act on the repository of the current directory). `install` accepts `--scope opt-in|all` and `--harness claude,codex`. Re-running `install` without `--scope` keeps the scope you chose earlier. Run `doctor` to check the registration.
 
 ### Scope and per-repository config
 
@@ -138,7 +138,7 @@ The scope lives in the user config (`$XDG_CONFIG_HOME/git-workflow-guard/config.
 ```json
 {
   "protectedBranches": ["main", "develop"],
-  "branchTypes": ["feature", "fix", "hotfix", "epic"],
+  "branchTypes": ["feature", "fix", "hotfix", "epic", "docs", "ci", "perf"],
   "attributionPatterns": [],
   "rules": { "merge-gate": "ask", "fresh-base": "warn", "tag-on-main": "off" }
 }
@@ -237,6 +237,9 @@ gitGraph
 |---------|------|-------------|---------|
 | `feature/<issue>-<slug>` | `develop` | `develop` | New features |
 | `fix/<issue>-<slug>` | `develop` | `develop` | Bug fixes |
+| `docs/<issue>-<slug>` | `develop` | `develop` | Documentation-only changes |
+| `ci/<issue>-<slug>` | `develop` | `develop` | CI pipeline changes |
+| `perf/<issue>-<slug>` | `develop` | `develop` | Performance improvements |
 | `hotfix/<issue>-<slug>` | `main` | `main` + `develop` | Urgent production fixes |
 | `release/<version>` | `develop` | `main` + `develop` | Release preparation |
 | `epic/<issue>-<slug>` | `develop` | `develop` | Plan of two or more slices; slice branches use the epic as base |
