@@ -138,7 +138,8 @@ const branchName = {
     const c = await newBranch(a, ctx);
     if (!c) return null;
     const { name } = c;
-    if (validName(name, ctx)) return null;
+    // Bootstrapping main/develop (e.g. git checkout -b develop) is part of the workflow.
+    if (validName(name, ctx) || protectedOf(ctx).includes(name)) return null;
     return finding('branch-name', `branch name "${name}" is invalid`,
       `Use <type>/<issue>-<slug> with type one of ${typesOf(ctx).join(', ')} (e.g. feature/12-add-login), or release/X.Y.Z`);
   },

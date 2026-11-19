@@ -91,6 +91,14 @@ test('branch-name', async () => {
   assert.deepEqual(await ids('git switch -c release/1.2'), ['branch-name:deny']);
 });
 
+test('branch-name allows creating a protected branch by name', async () => {
+  for (const line of ['git checkout -b develop', 'git checkout -b develop origin/develop', 'git switch -c main']) {
+    assert.deepEqual(await ids(line, ctx({ behindRemote: async () => 0 })), [], line);
+  }
+  assert.deepEqual(await ids('git checkout -b trunk', ctx({}, { protectedBranches: ['trunk'] })), []);
+  assert.deepEqual(await ids('git checkout -b develpo'), ['branch-name:deny']);
+});
+
 test('branch-issue', async () => {
   const seen = [];
   const st = (v) => ctx({ issueState: async (n) => { seen.push(n); return v; } });
@@ -151,7 +159,7 @@ test('resetting an existing or protected branch is not a creation', async () => 
   assert.ok(calls.includes('foo'));
   assert.deepEqual(await ids('git checkout -B foo develop', st(false)), ['branch-name:deny', 'fresh-base:deny']);
   assert.deepEqual(await ids('git checkout -B feature/9-x', st(false)), ['branch-issue:deny', 'fresh-base:deny']);
-  assert.deepEqual(await ids('git checkout -b develop', st(true)), ['branch-name:deny', 'fresh-base:deny']);
+  assert.deepEqual(await ids('git checkout -b develop', st(true)), ['fresh-base:deny']);
 });
 
 test('pr-base without --base uses the repository default branch', async () => {
