@@ -1,6 +1,6 @@
 ---
 name: git-workflow
-description: "Enforce a strict Gitflow-based workflow with conventional commits, semantic versioning, and issue-driven branching. Use when the user asks to commit, create a branch, open a PR, tag a release, or perform any git operation. Also applies when mentions 'commit', 'branch', 'merge', 'release', 'hotfix', 'gitflow', 'conventional commit', 'semantic versioning', or 'semver'."
+description: "Enforce a strict Gitflow-based workflow with conventional commits, semantic versioning, and issue-driven branching, including epic branches for multi-slice work. Use when the user asks to commit, create a branch, open a PR, tag a release, plan an epic, or perform any git operation. Also applies when mentions 'commit', 'branch', 'merge', 'release', 'hotfix', 'epic', 'slice', 'gitflow', 'conventional commit', 'semantic versioning', or 'semver'."
 version: 1.4.0
 license: MIT
 metadata:
@@ -17,6 +17,7 @@ Enforce a disciplined Gitflow-based development workflow. Every git operation fo
 - User asks to commit changes
 - User asks to create a branch, open a PR, or merge
 - User asks to tag a release or create a hotfix
+- User asks to group related issues into an epic, or a plan has two or more slices
 - User mentions "commit", "branch", "merge", "release", "hotfix", "gitflow", "conventional commit", "semver"
 - User asks about branching strategy or version management
 - Any git operation that affects the repository history
@@ -43,7 +44,7 @@ Enforce a disciplined Gitflow-based development workflow. Every git operation fo
 | Branch | Purpose | Merge via |
 |--------|---------|-----------|
 | `main` | Production-ready code | PR only (from `release/*` or `hotfix/*`) |
-| `develop` | Integration branch for next release | PR only (from `feature/*` or `fix/*`) |
+| `develop` | Integration branch for next release | PR only (from `feature/*`, `fix/*` or `epic/*`) |
 
 ### Working Branches
 
@@ -53,6 +54,9 @@ Enforce a disciplined Gitflow-based development workflow. Every git operation fo
 | `fix/<issue>-<slug>` | `develop` | `develop` | Bug fixes on develop |
 | `hotfix/<issue>-<slug>` | `main` | `main` AND `develop` | Urgent production fixes |
 | `release/<version>` | `develop` | `main` AND `develop` | Release preparation |
+| `epic/<issue>-<slug>` | `develop` | `develop` | Integration branch for a plan of two or more slices (see [Epics](#epics)) |
+
+A slice of an epic is an ordinary `feature/*` or `fix/*` branch whose base and merge target is the epic branch instead of `develop`.
 
 ### Sync Before Branching
 
@@ -64,7 +68,7 @@ git pull origin develop          # ← mandatory before branching
 git checkout -b feature/42-slug
 ```
 
-This applies to every branch type: `feature/*` and `fix/*` pull `develop`, `hotfix/*` pulls `main`, `release/*` pulls `develop`.
+This applies to every branch type: `feature/*`, `fix/*` and `epic/*` pull `develop`, `hotfix/*` pulls `main`, `release/*` pulls `develop`. A slice of an epic pulls its epic branch (`git pull origin epic/<issue>-<slug>`).
 
 ### Merge Strategy
 
@@ -78,13 +82,15 @@ This applies to every branch type: `feature/*` and `fix/*` pull `develop`, `hotf
 
 - **Not yet pushed**: rebase onto `develop` is acceptable (`git rebase develop`)
 - **Already pushed or PR open**: merge `develop` into the feature branch (`git merge develop`) — never force-push a rebased shared branch
+- **Epic branches** are always shared: `develop` reaches them only through a PR (see [Keeping the Epic Current](#keeping-the-epic-current))
 
 ### Branch Naming Convention
 
 - Always lowercase, hyphen-separated
 - Working branches (`feature/*`, `fix/*`, `hotfix/*`) are prefixed with the issue number
 - Release branches use version number only: `release/<version>`
-- Examples: `feature/42-add-search`, `fix/17-broken-navbar`, `hotfix/89-auth-crash`, `release/1.2.0`
+- Epic branches use the number of the dedicated epic issue: `epic/<epic-issue>-<slug>`
+- Examples: `feature/42-add-search`, `fix/17-broken-navbar`, `hotfix/89-auth-crash`, `release/1.2.0`, `epic/34-pre-alpha`
 
 ---
 
@@ -184,7 +190,7 @@ Branch deleted (remote + local)
 ### Rules
 
 1. **Every branch starts from a GitHub Issue** — no branch without an issue, including releases (create a lightweight "Release v1.2.0" issue with `chore` label)
-2. **One PR per issue** — the PR closes exactly one issue
+2. **One PR per issue** — the PR closes exactly one issue (exception: an epic PR, which closes the epic and lists its slices — see [Epics](#epics))
 3. **PR title** follows Conventional Commits format: `<type>(<scope>): <description> (#<issue>)` — e.g., `feat(auth): add OAuth2 login flow (#42)`
 4. **PR body** references the issue: `Closes #42`
 5. **Test plan verified before merge** — check off each item (`- [x]`) in the PR description as it passes. This makes test progress visible to reviewers and serves as an audit trail.
@@ -304,6 +310,124 @@ jobs:
 | `documentation` | Docs improvement |
 | `hotfix` | Urgent production fix |
 | `chore` | Maintenance task |
+| `epic` | Parent issue that groups the slices of one plan (added next to its type label) |
+
+---
+
+## Epics
+
+An epic groups the slices of one plan that are developed together and reach `develop` as a single, reviewed unit. Slices merge freely into the epic branch after review; the human merge gate applies only to the epic PR into `develop`.
+
+### When to Use an Epic
+
+| Situation | Approach |
+|-----------|----------|
+| Plan with a single slice | No epic — normal `feature/*` or `fix/*` into `develop` |
+| Plan with two or more slices | **Epic branch** — `epic/<issue>-<slug>`, slices merge into it |
+| Related issues that each land in `develop` independently and do not conflict (e.g. a release checklist) | **Tracking epic** — epic issue only, no epic branch (see below) |
+
+### The Epic Issue
+
+Create a dedicated epic issue for every epic. Never reuse a child issue's number for the epic branch.
+
+- **Title**: a normal Conventional Commits title for the whole piece of work — e.g. `feat(auth): account sessions`. Do not put `epic` in the type or scope.
+- **Labels**: the type label (`enhancement`, `bug`, `chore`, ...) **plus** `epic`
+- **Body**:
+
+```markdown
+## Goal
+<what the epic delivers and why>
+
+## Slices
+- [ ] #101 feat(auth): track sessions per device
+- [ ] #102 feat(auth): list sessions in settings
+- [ ] #103 fix(auth): revoke session on password change
+
+## Definition of done
+<what must be true before the epic PR merges into develop>
+
+## Out of scope
+<what this epic deliberately does not do>
+```
+
+- Create the slice issues first, then fill their numbers into the `## Slices` task list. Tick each box (`gh issue edit`) as its slice merges into the epic.
+- Each slice issue body references its epic: `Part of #<epic>`.
+- The task list is the source of truth. If the repository uses GitHub sub-issues, additionally link the slices as sub-issues of the epic.
+
+### Epic Flow
+
+```
+Epic issue + slice issues created
+    ↓
+epic/<epic>-<slug> created from a fresh develop and pushed
+    ↓
+For each slice:
+    feature/<slice>-<slug> from the epic branch
+    → atomic commits → PR with --base epic/<epic>-<slug>
+    → review + green CI → merge (--merge, --no-ff)
+    → slice issue closed, box ticked in the epic
+    ↓
+Epic PR: epic/<epic>-<slug> → develop
+    ↓
+Human approval → merge (--no-ff) → epic issue closed → epic branch deleted
+```
+
+```bash
+# Create the epic branch
+git checkout develop
+git pull origin develop
+git checkout -b epic/180-beta
+git push -u origin epic/180-beta
+
+# Start a slice from the epic
+git checkout epic/180-beta
+git pull origin epic/180-beta
+git checkout -b feature/156-sync-settings
+# ... atomic commits ...
+gh pr create --base epic/180-beta --title "feat(sync): sync settings across devices (#156)"
+```
+
+### Slice PRs
+
+- **Base**: the epic branch, never `develop`
+- **Title**: Conventional Commits with the slice issue — `feat(sync): sync settings across devices (#156)`
+- **Body**: `Closes #<slice>` and `Part of #<epic>`
+- **Merge**: `gh pr merge <N> --merge --delete-branch` once review is done and CI is green
+- **No human approval gate**: creating slice issues and branches, pushing slices, opening slice PRs and merging them into the epic do not need the owner's approval. Do not stop to ask for these steps.
+- **Close the slice issue on merge**: GitHub only auto-closes on the default branch. The reference [auto-close workflow](#recommended-auto-close-workflow) handles any non-default base, including `epic/*`; without it, close by hand: `gh issue close <slice> --comment "Closed by #<pr> (merged into epic/<epic>-<slug>)."`
+
+### Keeping the Epic Current
+
+When `develop` moves ahead, bring it into the epic through a PR — never by rebase or force-push:
+
+- **No conflicts**: open a PR with head `develop` and base `epic/<epic>-<slug>`, and merge it with `--merge`
+- **Conflicts**: create `feature/<epic>-sync-develop` from the epic branch, `git merge develop`, resolve, and open a PR into the epic branch
+
+### The Epic PR
+
+When every slice has merged:
+
+- **Head/base**: `epic/<epic>-<slug>` → `develop`
+- **Title**: the epic issue's title with its number — `feat(auth): account sessions (#126)`
+- **Body**: a summary of every slice and its PR, what stayed open, then `Closes #<epic>` and a `Closes #<slice>` line for every slice (traceability; already-closed slices are skipped by the workflow)
+- **Verify**: run the full test and lint suite on the epic branch once more
+- **Merge gate**: this is the PR that needs the owner's approval. Ask before merging it; merge with `gh pr merge <N> --merge --delete-branch`
+- A change request on the epic PR becomes a new slice on the same epic branch; the epic PR stays open
+
+### Tracking Epic (No Epic Branch)
+
+When the slices are independent and each can safely land in `develop` on its own, the epic issue only groups them:
+
+- Same epic issue format (`epic` label, `## Slices` task list)
+- Slices branch from `develop`, open PRs into `develop`, and follow the normal approval rules for `develop`
+- The epic issue closes when its last slice lands: list `Closes #<epic>` in that slice's PR, or close it by hand
+
+### Epic Infrastructure
+
+- **CI**: the `pull_request` trigger must include `epic/**`, otherwise slice PRs show "no checks" and the CI gate is meaningless
+- **Protection**: protect `epic/*` like `develop` where the plan allows rulesets — require a PR, block force-push and deletion. Where rulesets are unavailable, the rules below still apply.
+- **One level only**: do not nest epics. Finish and merge one epic into `develop` before starting a dependent one.
+- **Releases**: an unfinished epic is not in `develop`, so it never blocks a release. Cut the release before or after the epic PR, never from the epic branch.
 
 ---
 
@@ -480,6 +604,11 @@ Follow [Keep a Changelog](https://keepachangelog.com/):
 ## Forbidden (NEVER Do)
 
 - Commit directly to `main` or `develop` (sole exception: repository bootstrap)
+- Push commits directly to an `epic/*` branch (only the creating push from `develop` is allowed; everything else arrives through a PR)
+- Rebase, force-push or delete an epic branch before its epic PR is merged
+- Open a slice PR into `develop` while its epic branch exists
+- Merge an epic PR into `develop` without the owner's approval
+- Nest an epic branch inside another epic branch
 - Add AI/copilot co-author signatures to commits
 - Create a branch without a backing issue
 - Mix multiple logical changes in one commit
@@ -507,6 +636,8 @@ Follow [Keep a Changelog](https://keepachangelog.com/):
 | Bug found during development | `fix/*` | `develop` |
 | Bug found in production | `hotfix/*` | `main` |
 | Preparing a release | `release/*` | `develop` |
+| Plan with two or more slices | `epic/*` | `develop` |
+| Slice of an open epic | `feature/*` or `fix/*` | the epic branch |
 
 ### "What commit type do I use?"
 
@@ -529,6 +660,7 @@ Follow [Keep a Changelog](https://keepachangelog.com/):
 | Situation | Action |
 |-----------|--------|
 | Merging feature/fix to develop | No version bump yet |
+| Merging a slice into an epic, or an epic into develop | No version bump yet |
 | Creating a release branch | Bump version on release branch |
 | Merging hotfix to main | Bump PATCH version on hotfix branch |
 | Breaking change anywhere | MAJOR bump at release time |
