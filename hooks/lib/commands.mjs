@@ -66,7 +66,7 @@ const GH_SUBS = {
   issue: new Set(['create', 'edit']),
 };
 // Long git global options that may take their value as a separate argument (besides -C/-c below).
-const GIT_GLOBAL_VALUE = new Set(['--git-dir', '--work-tree', '--namespace', '--exec-path']);
+const GIT_GLOBAL_VALUE = new Set(['--git-dir', '--work-tree', '--namespace', '--attr-source']);
 
 const base = (s) => String(s ?? '').replace(/^.*[\\/]/, '').replace(/\.exe$/i, '');
 

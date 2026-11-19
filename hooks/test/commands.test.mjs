@@ -168,3 +168,10 @@ test('git tag -m/-F fill texts.message', () => {
   assert.equal(rec('git tag -a v1 -m "rel"').texts.message, 'rel');
   assert.equal(rec('git tag -a v1 -F n.txt', () => 'notes').texts.message, 'notes');
 });
+
+test('git global options with separate values: --attr-source consumes, --exec-path does not', () => {
+  assert.equal(rec('git --attr-source HEAD commit -m x').sub, 'commit');
+  assert.equal(rec('git --attr-source=HEAD commit -m x').sub, 'commit');
+  assert.equal(rec('git --exec-path commit -m x').sub, 'commit');
+  assert.equal(rec('git --namespace ns --work-tree /w push origin a').sub, 'push');
+});
