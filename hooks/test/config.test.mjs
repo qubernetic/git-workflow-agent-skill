@@ -19,7 +19,7 @@ const repo = (name = 'repo') => { fs.mkdirSync(path.join(tmp, name, '.git'), { r
 const envFor = (scope) => {
   const dir = path.join(tmp, 'xdg');
   if (scope) mk('xdg/git-workflow-guard/config.json', JSON.stringify({ scope }));
-  return { XDG_CONFIG_HOME: dir };
+  return { XDG_CONFIG_HOME: dir, APPDATA: dir };
 };
 
 test('userConfigPath: XDG_CONFIG_HOME, HOME fallback, Windows APPDATA', () => {
@@ -109,7 +109,7 @@ test('wrongly typed keys fall back to defaults with warnings', () => {
 test('invalid user config: opt-in with warning', () => {
   const r = repo();
   mk('xdg/git-workflow-guard/config.json', '{bad');
-  const c = loadConfig({ cwd: r, env: { XDG_CONFIG_HOME: path.join(tmp, 'xdg') } });
+  const c = loadConfig({ cwd: r, env: { XDG_CONFIG_HOME: path.join(tmp, 'xdg'), APPDATA: path.join(tmp, 'xdg') } });
   assert.equal(c.scope, 'opt-in');
   assert.equal(c.active, false);
   assert.equal(c.warnings.length, 1);
