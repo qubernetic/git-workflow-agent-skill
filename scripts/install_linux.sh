@@ -105,6 +105,11 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
+case "$SCOPE" in
+  ""|opt-in|all) ;;
+  *) fail "Invalid --scope value: $SCOPE (use opt-in or all)"; usage ;;
+esac
+
 if [[ "$ACTION" == "uninstall" ]]; then
   uninstall
 else
