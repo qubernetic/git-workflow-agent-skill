@@ -8,6 +8,8 @@ import { HARNESSES } from '../lib/manage/registry.mjs';
 import { install, doctor, formatDoctor, repair, update } from '../lib/manage/commands.mjs';
 import { userConfigPath } from '../lib/config.mjs';
 
+const SKILL_VERSION = /^version:\s*"?([^"\s]+)"?\s*$/m.exec(fs.readFileSync(new URL('../../SKILL.md', import.meta.url), 'utf8'))[1];
+
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gwg-doctor-'));
 let n = 0;
 function makeEnv({ claude = true, codex = false } = {}) {
@@ -70,7 +72,7 @@ test('repair backs up an invalid user config before rewriting it', () => {
   const lines = repair({ env });
   assert.equal(fs.readFileSync(`${file}.bak`, 'utf8'), '{"scope": "all",');
   assert.ok(lines.some((l) => l.includes(`${file}.bak`)), lines.join('\n'));
-  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).version, '1.4.0');
+  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).version, SKILL_VERSION);
   const again = repair({ env });
   assert.ok(!again.some((l) => l.includes('.bak')));
 });

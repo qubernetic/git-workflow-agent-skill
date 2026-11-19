@@ -9,6 +9,8 @@ import { HARNESSES, register, unregister } from '../lib/manage/registry.mjs';
 import { install, uninstall, enable, disable } from '../lib/manage/commands.mjs';
 import { userConfigPath } from '../lib/config.mjs';
 
+const SKILL_VERSION = /^version:\s*"?([^"\s]+)"?\s*$/m.exec(fs.readFileSync(new URL('../../SKILL.md', import.meta.url), 'utf8'))[1];
+
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gwg-manage-'));
 let n = 0;
 function makeEnv({ claude = true, codex = true } = {}) {
@@ -112,7 +114,7 @@ test('install writes user config, registers detected harnesses, hints codex feat
   const cfg = readJson(userConfigPath(env));
   assert.equal(cfg.scope, 'opt-in');
   assert.match(cfg.guardPath, /hooks[\\/]guard\.mjs$/);
-  assert.equal(cfg.version, '1.4.0');
+  assert.equal(cfg.version, SKILL_VERSION);
   assert.deepEqual(cfg.harnesses.sort(), ['claude', 'codex']);
   assert.ok(fs.existsSync(HARNESSES.claude.configPath(env)));
   assert.ok(lines.some((l) => /hooks = true/.test(l)));

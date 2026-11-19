@@ -42,8 +42,8 @@ $Source = Join-Path $RepoRoot "SKILL.md"
 $Guard = Join-Path $RepoRoot "hooks\guard.mjs"
 
 function Write-Info  { param($Msg) Write-Host "  i " -ForegroundColor Blue -NoNewline; Write-Host $Msg }
-function Write-Pass  { param($Msg) Write-Host "  ✓ " -ForegroundColor Green -NoNewline; Write-Host $Msg }
-function Write-Fail  { param($Msg) Write-Host "  ✗ " -ForegroundColor Red -NoNewline; Write-Host $Msg }
+function Write-Pass  { param($Msg) Write-Host "  $([char]0x2713) " -ForegroundColor Green -NoNewline; Write-Host $Msg }
+function Write-Fail  { param($Msg) Write-Host "  $([char]0x2717) " -ForegroundColor Red -NoNewline; Write-Host $Msg }
 
 function Test-SymlinkSupport {
     $testDir = Join-Path $env:TEMP "symlink_test_$(Get-Random)"
@@ -92,10 +92,10 @@ function Invoke-Uninstall {
             Write-Info "Removed empty directory: $SkillDir"
         }
     } elseif ($item) {
-        Write-Fail "$SkillFile exists but is not a symlink — remove it manually to avoid data loss"
+        Write-Fail "$SkillFile exists but is not a symlink - remove it manually to avoid data loss"
         exit 1
     } else {
-        Write-Info "Nothing to uninstall — $SkillFile does not exist"
+        Write-Info "Nothing to uninstall - $SkillFile does not exist"
     }
 }
 
@@ -114,11 +114,11 @@ function Invoke-Install {
             Write-Pass "Already installed (symlink points to $Source)"
             return
         } else {
-            Write-Info "Existing symlink points to $currentTarget — replacing"
+            Write-Info "Existing symlink points to $currentTarget - replacing"
             Remove-Item $SkillFile -Force
         }
     } elseif ($item) {
-        Write-Fail "$SkillFile exists but is not a symlink — remove it manually before installing"
+        Write-Fail "$SkillFile exists but is not a symlink - remove it manually before installing"
         exit 1
     }
 
@@ -136,7 +136,7 @@ function Invoke-Install {
     # Create directory and symlink
     New-Item -ItemType Directory -Path $SkillDir -Force | Out-Null
     New-Item -ItemType SymbolicLink -Path $SkillFile -Target $Source | Out-Null
-    Write-Pass "Installed: $SkillFile → $Source"
+    Write-Pass "Installed: $SkillFile -> $Source"
     Write-Info "The skill will stay in sync with this repo. Restart Claude Code to activate."
 }
 

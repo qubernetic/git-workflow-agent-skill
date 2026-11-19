@@ -1,11 +1,11 @@
 ---
 name: git-workflow
 description: "Enforce a strict Gitflow-based workflow with conventional commits, semantic versioning, and issue-driven branching, including epic branches for multi-slice work. Use when the user asks to commit, create a branch, open a PR, tag a release, plan an epic, or perform any git operation. Also applies when mentions 'commit', 'branch', 'merge', 'rebase', 'force-push', 'release', 'hotfix', 'epic', 'slice', 'gitflow', 'conventional commit', 'semantic versioning', or 'semver'."
-version: 1.4.0
+version: 1.5.0
 license: MIT
 metadata:
   author: Qubernetic
-  version: 1.4.0
+  version: 1.5.0
 ---
 
 # Git Workflow Skill
