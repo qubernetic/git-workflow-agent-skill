@@ -13,7 +13,7 @@
 //     `worktree add -b`, `gh pr create -m` is a milestone and stays `m`).
 //   Alias table:
 //     gh pr merge   : -s squash, -r rebase, -m merge, -d delete-branch,
-//                     -t title, -b body, -B base, -H head, -F body-file
+//                     -t subject (NOT title), -b body, -B base, -H head, -F body-file
 //     gh pr create/edit, gh issue create/edit:
 //                     -t title, -b body, -B base, -H head, -F body-file
 //     git commit    : -m message, -F file, -n no-verify, -a all
@@ -30,7 +30,7 @@ const ALIASES = {
   'git commit': { m: 'message', F: 'file', n: 'no-verify', a: 'all' },
   'git tag': { m: 'message', F: 'file' },
   'git push': { f: 'force', d: 'delete', u: 'set-upstream' },
-  'gh pr merge': { s: 'squash', r: 'rebase', m: 'merge', d: 'delete-branch', ...GH_TEXT },
+  'gh pr merge': { s: 'squash', r: 'rebase', m: 'merge', d: 'delete-branch', ...GH_TEXT, t: 'subject' },
   'gh pr create': GH_TEXT,
   'gh pr edit': GH_TEXT,
   'gh issue create': GH_TEXT,
@@ -53,7 +53,7 @@ const VALUE_FLAGS = {
   'git worktree': ['b', 'B', 'reason'],
   'git tag': ['m', 'message', 'F', 'file', 'u', 'local-user', 'contains', 'no-contains', 'merged',
     'no-merged', 'points-at', 'sort', 'format'],
-  'gh pr merge': ['title', 'body', 'body-file', 'A', 'author-email', 'match-head-commit', 'repo', 'R'],
+  'gh pr merge': ['subject', 'body', 'body-file', 'A', 'author-email', 'match-head-commit', 'repo', 'R'],
   'gh pr create': gh,
   'gh pr edit': gh,
   'gh issue create': gh,
@@ -65,7 +65,7 @@ const GH_SUBS = {
   pr: new Set(['create', 'edit', 'merge']),
   issue: new Set(['create', 'edit']),
 };
-// Git global options that consume a separate value argument (besides -C/-c handled below).
+// Long git global options that may take their value as a separate argument (besides -C/-c below).
 const GIT_GLOBAL_VALUE = new Set(['--git-dir', '--work-tree', '--namespace', '--exec-path']);
 
 const base = (s) => String(s ?? '').replace(/^.*[\\/]/, '').replace(/\.exe$/i, '');
@@ -79,7 +79,7 @@ function resolveDir(dir, cwd) {
   return join(cwd, dir);
 }
 
-// Skips git global options; returns {i: index of subcommand, cwd}.
+// Skips git global options (any --long[=v], -p, -P, -C, -c); the first other word is the subcommand. Returns {i: index of subcommand, cwd}.
 function skipGitGlobals(argv, cwd) {
   let i = 1;
   while (i < argv.length) {
@@ -87,9 +87,8 @@ function skipGitGlobals(argv, cwd) {
     if (a === '-C' && i + 1 < argv.length) { cwd = resolveDir(argv[i + 1], cwd); i += 2; }
     else if (a === '-c' && i + 1 < argv.length) i += 2;
     else if (GIT_GLOBAL_VALUE.has(a)) i += 2;
-    else if (a.startsWith('--') && a.includes('=') && GIT_GLOBAL_VALUE.has(a.split('=')[0])) i += 1;
-    else if (a === '--no-pager' || a === '-P' || a === '-p' || a === '--paginate'
-      || a === '--no-optional-locks' || a === '--bare' || a === '--no-replace-objects') i += 1;
+    else if (a.startsWith('--') && a.length > 2) i += 1;
+    else if (a === '-p' || a === '-P') i += 1;
     else break;
   }
   return { i, cwd };
@@ -157,7 +156,7 @@ export function recognise(cmd, readFile = defaultReadFile) {
   };
 
   const texts = {};
-  if (tool === 'git' && sub === 'commit') {
+  if (tool === 'git' && (sub === 'commit' || sub === 'tag')) {
     const parts = [];
     if (typeof flags.get('message') === 'string') parts.push(flags.get('message'));
     if (typeof flags.get('file') === 'string') {
@@ -165,8 +164,9 @@ export function recognise(cmd, readFile = defaultReadFile) {
       if (t != null) parts.push(t);
     }
     if (parts.length) texts.message = parts.join('\n\n');
-  } else if (tool === 'gh' && /create|edit/.test(sub)) {
-    if (typeof flags.get('title') === 'string') texts.title = flags.get('title');
+  } else if (tool === 'gh' && /create|edit|merge/.test(sub)) {
+    const title = flags.get(sub === 'pr merge' ? 'subject' : 'title');
+    if (typeof title === 'string') texts.title = title;
     if (typeof flags.get('body') === 'string') texts.body = flags.get('body');
     else if (typeof flags.get('body-file') === 'string') {
       const t = fileText(flags.get('body-file'));

@@ -139,3 +139,32 @@ test('non git/gh commands return null', () => {
   assert.equal(rec('gh pr list'), null);
   assert.equal(rec('gh auth login'), null);
 });
+
+test('gh pr merge --subject is a value flag; -t means subject', () => {
+  const a = rec('gh pr merge --subject "s" 42');
+  assert.deepEqual(a.positionals, ['42']);
+  assert.equal(a.flags.get('subject'), 's');
+  const b = rec('gh pr merge -t "s2" 42');
+  assert.equal(b.flags.get('subject'), 's2');
+  assert.deepEqual(b.positionals, ['42']);
+  assert.equal(b.texts.title, 's2');
+});
+
+test('gh pr merge fills texts from subject/body', () => {
+  const a = rec('gh pr merge 4 --merge --body "x\n\nCo-Authored-By: Claude"');
+  assert.match(a.texts.body, /Co-Authored-By/);
+  const b = rec('gh pr merge 4 --merge -F body.md', () => 'Co-Authored-By: Claude');
+  assert.match(b.texts.body, /Co-Authored-By/);
+});
+
+test('unlisted git global options are skipped', () => {
+  const a = rec('git --literal-pathspecs --no-advice commit -m x');
+  assert.equal(a.sub, 'commit');
+  assert.equal(a.texts.message, 'x');
+  assert.equal(rec('git --git-dir=/x -p push origin a').sub, 'push');
+});
+
+test('git tag -m/-F fill texts.message', () => {
+  assert.equal(rec('git tag -a v1 -m "rel"').texts.message, 'rel');
+  assert.equal(rec('git tag -a v1 -F n.txt', () => 'notes').texts.message, 'notes');
+});
