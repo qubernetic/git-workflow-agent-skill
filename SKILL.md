@@ -1,6 +1,6 @@
 ---
 name: git-workflow
-description: "Enforce a strict Gitflow-based workflow with conventional commits, semantic versioning, and issue-driven branching, including epic branches for multi-slice work. Use when the user asks to commit, create a branch, open a PR, tag a release, plan an epic, or perform any git operation. Also applies when mentions 'commit', 'branch', 'merge', 'release', 'hotfix', 'epic', 'slice', 'gitflow', 'conventional commit', 'semantic versioning', or 'semver'."
+description: "Enforce a strict Gitflow-based workflow with conventional commits, semantic versioning, and issue-driven branching, including epic branches for multi-slice work. Use when the user asks to commit, create a branch, open a PR, tag a release, plan an epic, or perform any git operation. Also applies when mentions 'commit', 'branch', 'merge', 'rebase', 'force-push', 'release', 'hotfix', 'epic', 'slice', 'gitflow', 'conventional commit', 'semantic versioning', or 'semver'."
 version: 1.4.0
 license: MIT
 metadata:
@@ -80,9 +80,50 @@ This applies to every branch type: `feature/*`, `fix/*` and `epic/*` pull `devel
 
 ### Keeping Feature Branches Up to Date
 
-- **Not yet pushed**: rebase onto `develop` is acceptable (`git rebase develop`)
-- **Already pushed or PR open**: merge `develop` into the feature branch (`git merge develop`) — never force-push a rebased shared branch
+- **Merge always works**: `git merge develop` (or the PR's base, e.g. the epic branch for a slice) is allowed on any working branch
+- **Rebase where the [Rebase Rules](#rebase-rules) allow it**: onto the updated base, to fold review fixups, or to keep a stack in line
 - **Epic branches** are always shared: `develop` reaches them only through a PR (see [Keeping the Epic Current](#keeping-the-epic-current))
+
+### Rebase Rules
+
+Rebasing rewrites commit hashes. That is fine on a branch only you use and harmful on a branch others build on. The branch decides:
+
+| Branch | Rebase |
+|---|---|
+| `main`, `develop`, `epic/*`, `release/*` | **Forbidden** (shared); update by merge |
+| Own working branch, not pushed | **Free** |
+| Own working branch, pushed or PR open | **Allowed** if you are its single owner and nobody branched from it; push with `--force-with-lease` only; rerun the tests and let CI run again |
+| Branch of an approved PR | **Only** fixup folding or a rebase onto the base, no content change; any other change needs a new review request |
+| Someone else's branch, or a branch a stack builds on | **Forbidden**, except rebasing the stack's own chain with `--update-refs` |
+
+- **Amend counts as rebase**: `git commit --amend` on a pushed commit follows the same table
+- **Never plain `--force`**: a permitted rewrite is pushed with `git push --force-with-lease`, which refuses if the remote moved since your last fetch
+- **Check before rewriting a pushed branch**: `git fetch origin` and `git log HEAD..origin/<branch>` must be empty; if someone else pushed, merge instead
+- **Merge strategy is unchanged**: rebase only reshapes a working branch; protected branches still receive it through a PR with `--merge` (`--no-ff`), never squash or rebase merge
+
+#### Rebase Recipes
+
+```bash
+# Rebase onto the updated base (develop, or the epic branch for a slice)
+git fetch origin
+git rebase origin/develop
+git push --force-with-lease origin feature/<issue>-<slug>
+
+# Fold review fixups into the commits they fix, non-interactively
+git commit --fixup=<commit-to-fix>
+GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash origin/develop
+git push --force-with-lease origin feature/<issue>-<slug>
+
+# Stack: move a child branch after its parent branch was rewritten
+git rebase --onto <parent-branch> <old-parent-tip> feature/<child-issue>-<slug>
+
+# Stack: rebase the whole chain at once (Git ≥ 2.38), every branch ref moves along
+git checkout <top-of-stack>
+git rebase --update-refs origin/develop
+git push --force-with-lease origin <each-rewritten-branch>
+```
+
+> `GIT_SEQUENCE_EDITOR=:` accepts the generated todo list unchanged. Outside a POSIX shell (cmd, PowerShell) use the shell-independent form: `git -c sequence.editor=: rebase -i --autosquash origin/develop`. `<old-parent-tip>` is the parent commit the child was built on; find it with `git reflog <parent-branch>`.
 
 ### Branch Naming Convention
 
@@ -613,7 +654,8 @@ Follow [Keep a Changelog](https://keepachangelog.com/):
 - Create a branch without a backing issue
 - Mix multiple logical changes in one commit
 - Use past tense in commit messages ("added", "fixed")
-- Force-push to `main` or `develop`
+- Force-push to `main`, `develop` or `release/*`
+- Push a rewritten branch with plain `--force` instead of `--force-with-lease`
 - Merge without a PR
 - Squash merge or rebase merge into protected branches
 - Fast-forward merge into protected branches (always use `--no-ff`)
@@ -621,8 +663,9 @@ Follow [Keep a Changelog](https://keepachangelog.com/):
 - Delete `main` or `develop` branches
 - Tag a release without updating CHANGELOG.md
 - Tag a release without creating a GitHub Release
-- Use `git commit --amend` on pushed commits
-- Use `git rebase` on shared/published branches
+- Rebase `main`, `develop`, `epic/*` or `release/*`
+- Rebase or amend someone else's branch, or a branch a stack builds on (except the stack's own chain with `--update-refs`) — see [Rebase Rules](#rebase-rules)
+- Change the content of an approved PR by rebase without requesting review again
 
 ---
 
@@ -665,6 +708,17 @@ Follow [Keep a Changelog](https://keepachangelog.com/):
 | Merging hotfix to main | Bump PATCH version on hotfix branch |
 | Breaking change anywhere | MAJOR bump at release time |
 
+### "Merge or rebase?"
+
+| Situation | Action |
+|-----------|--------|
+| Base moved, branch not pushed | Rebase onto the base |
+| Base moved, own pushed branch, nobody built on it | Rebase and `--force-with-lease`, or merge the base |
+| Base moved, branch shared or others built on it | Merge the base |
+| Review fixups on own branch or approved PR | `--fixup` commits, then autosquash rebase |
+| Parent branch of a stack was rewritten | `git rebase --onto`, or `--update-refs` for the whole chain |
+| `develop` moved ahead of an epic | Merge through a PR (see [Keeping the Epic Current](#keeping-the-epic-current)) |
+
 ---
 
 ## Troubleshooting
@@ -696,6 +750,8 @@ git rebase develop
 git checkout feature/<issue>-<slug>
 git merge develop
 ```
+
+On a pushed branch you own alone, rebasing is also allowed (see [Rebase Rules](#rebase-rules)): `git rebase origin/develop`, rerun the tests, then `git push --force-with-lease`.
 
 ### "I squash-merged instead of merge-committing"
 
@@ -746,6 +802,8 @@ git checkout -b feature/<issue>-<slug>
 
 # If you already have commits — rebase them onto develop
 git rebase --onto develop main feature/<issue>-<slug>
+# If the branch was already pushed (and you own it alone), push the rewrite
+git push --force-with-lease origin feature/<issue>-<slug>
 ```
 
 ### "My PR has merge conflicts"
@@ -763,7 +821,7 @@ git commit   # accept the merge commit message
 git push origin feature/<issue>-<slug>
 ```
 
-> **Note:** Never rebase a branch that's already pushed or has an open PR. Use merge to incorporate upstream changes.
+> **Note:** Merging the base is always safe. If the [Rebase Rules](#rebase-rules) allow it (your own branch, nobody built on it), you may rebase onto the base instead and push with `--force-with-lease`; on an approved PR this is fine as long as the rebase changes no content.
 
 ### "I accidentally deleted a branch before it was merged"
 
