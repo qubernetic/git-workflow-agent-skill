@@ -10,7 +10,7 @@
 #   ./scripts/install_linux.sh                     # Install skill + guard hooks
 #   ./scripts/install_linux.sh --scope all         # Guard active in every repository
 #   ./scripts/install_linux.sh --no-hooks          # Install the skill only
-#   ./scripts/install_linux.sh --uninstall         # Uninstall skill + guard hooks
+#   ./scripts/install_linux.sh --uninstall         # Uninstall skill + agent hooks (repo git hooks stay)
 
 set -euo pipefail
 

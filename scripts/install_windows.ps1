@@ -10,7 +10,8 @@
     when node is available.
 
 .PARAMETER Uninstall
-    Remove the skill symlink and the guard hooks.
+    Remove the skill symlink and the agent hooks. Per-repository git hooks
+    from "enable --git-hooks" and the user config stay.
 
 .PARAMETER NoHooks
     Do not touch the guard hooks.

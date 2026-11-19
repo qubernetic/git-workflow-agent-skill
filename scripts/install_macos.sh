@@ -10,7 +10,7 @@
 #   ./scripts/install_macos.sh                     # Install skill + guard hooks
 #   ./scripts/install_macos.sh --scope all         # Guard active in every repository
 #   ./scripts/install_macos.sh --no-hooks          # Install the skill only
-#   ./scripts/install_macos.sh --uninstall         # Uninstall skill + guard hooks
+#   ./scripts/install_macos.sh --uninstall         # Uninstall skill + agent hooks (repo git hooks stay)
 
 set -euo pipefail
 
