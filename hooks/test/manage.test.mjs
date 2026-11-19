@@ -96,6 +96,18 @@ test('unregister drops the hooks key when only our entries were in it', () => {
   assert.deepEqual(readJson(file), { theme: 'dark' });
 });
 
+test('install backs up an invalid user config before rewriting it', () => {
+  const env = makeEnv();
+  install({ scope: 'all', env });
+  const file = userConfigPath(env);
+  fs.writeFileSync(file, '{"scope": "all",');
+  const lines = install({ env });
+  assert.equal(fs.readFileSync(`${file}.bak`, 'utf8'), '{"scope": "all",');
+  assert.ok(lines.some((l) => l.includes(`${file}.bak`)), lines.join('\n'));
+  assert.equal(readJson(file).scope, 'opt-in');
+  assert.ok(!install({ env }).some((l) => l.includes('.bak')));
+});
+
 test('unregister removes only ours', () => {
   const env = makeEnv();
   const file = HARNESSES.claude.configPath(env);

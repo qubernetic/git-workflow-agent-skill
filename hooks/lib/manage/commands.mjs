@@ -24,6 +24,16 @@ function codexFeatureEnabled(env) {
   } catch { return false; }
 }
 
+// Keep the user's broken file: a typo must not silently reset scope or other settings.
+function backUpInvalid(user, lines) {
+  if (user.value || user.missing) return;
+  fs.copyFileSync(user.file, `${user.file}.bak`);
+  lines.push(`invalid user config ${user.file} (${user.error}) backed up to ${user.file}.bak`);
+}
+
+const mergeHarnesses = (existing, registered) =>
+  [...new Set([...(Array.isArray(existing) ? existing : []), ...registered])];
+
 export function install({ scope, harnesses, env = process.env } = {}) {
   if (scope !== undefined && scope !== 'opt-in' && scope !== 'all') throw new Error(`invalid scope ${JSON.stringify(scope)}; use opt-in or all`);
   const lines = [];
@@ -43,13 +53,15 @@ export function install({ scope, harnesses, env = process.env } = {}) {
       lines.push(`${name}: error: ${e.message}; left untouched`);
     }
   }
-  const file = userConfigPath(env);
-  const existing = readUserConfig(env).value;
+  const user = readUserConfig(env);
+  backUpInvalid(user, lines);
+  const file = user.file;
+  const existing = user.value;
   const kept = scope === undefined && (existing?.scope === 'all' || existing?.scope === 'opt-in');
   const finalScope = scope ?? (kept ? existing.scope : 'opt-in');
   const cfg = {
     scope: finalScope, version: skillVersion(), guardPath: GUARD_PATH,
-    harnesses: [...new Set([...(Array.isArray(existing?.harnesses) ? existing.harnesses : []), ...registered])],
+    harnesses: mergeHarnesses(existing?.harnesses, registered),
   };
   writeFileThrough(file, `${JSON.stringify(cfg, null, 2)}\n`);
   lines.push(`user config written to ${file} (scope: ${finalScope}${kept ? ', kept' : ''})`);
@@ -263,13 +275,9 @@ export function repair({ env = process.env } = {}) {
     }
   }
   const user = readUserConfig(env);
-  if (!user.value && !user.missing) {
-    // Keep the user's broken file: a typo must not silently reset scope or other settings.
-    fs.copyFileSync(user.file, `${user.file}.bak`);
-    lines.push(`invalid user config ${user.file} (${user.error}) backed up to ${user.file}.bak`);
-  }
+  backUpInvalid(user, lines);
   const base = user.value ?? {};
-  const cfg = { ...base, scope: base.scope === 'all' ? 'all' : 'opt-in', version: skillVersion(), guardPath: GUARD_PATH, harnesses: [...new Set([...(base.harnesses ?? []), ...registered])] };
+  const cfg = { ...base, scope: base.scope === 'all' ? 'all' : 'opt-in', version: skillVersion(), guardPath: GUARD_PATH, harnesses: mergeHarnesses(base.harnesses, registered) };
   writeFileThrough(user.file, `${JSON.stringify(cfg, null, 2)}\n`);
   lines.push(`user config rewritten at ${user.file} (version ${cfg.version})`);
   return lines;
