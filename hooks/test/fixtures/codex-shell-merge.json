@@ -1,0 +1,1 @@
+{"hook_event_name":"PreToolUse","cwd":"__CWD__","tool_name":"shell","tool_input":{"command":["bash","-lc","gh pr merge 5 --squash"]}}
