@@ -9,7 +9,7 @@ const finding = (rule, what, instead) => ({
 });
 
 const DEFAULT_PROTECTED = ['main', 'develop'];
-const DEFAULT_TYPES = ['feature', 'fix', 'hotfix', 'epic'];
+const DEFAULT_TYPES = ['feature', 'fix', 'hotfix', 'epic', 'docs', 'ci', 'perf'];
 const RELEASE_NAME = /^release\/\d+\.\d+\.\d+(-(alpha|beta|rc)\.\d+)?$/;
 const protectedOf = (ctx) => ctx.config?.protectedBranches ?? DEFAULT_PROTECTED;
 const typesOf = (ctx) => ctx.config?.branchTypes ?? DEFAULT_TYPES;
@@ -177,9 +177,14 @@ const freshBase = {
   },
 };
 
+const DEVELOP_OR_EPIC = ['develop or an epic/* branch', (b) => b === 'develop' || /^epic\/./.test(b)];
+
 const EXPECTED_BASE = {
-  feature: ['develop or an epic/* branch', (b) => b === 'develop' || /^epic\/./.test(b)],
-  fix: ['develop or an epic/* branch', (b) => b === 'develop' || /^epic\/./.test(b)],
+  feature: DEVELOP_OR_EPIC,
+  fix: DEVELOP_OR_EPIC,
+  docs: DEVELOP_OR_EPIC,
+  ci: DEVELOP_OR_EPIC,
+  perf: DEVELOP_OR_EPIC,
   epic: ['develop', (b) => b === 'develop'],
   release: ['main', (b) => b === 'main'],
   hotfix: ['main', (b) => b === 'main'],

@@ -4,7 +4,7 @@ import path from 'node:path';
 
 const RULE_VALUES = ['on', 'off', 'warn', 'ask', 'deny'];
 const DEFAULT_PROTECTED = ['main', 'develop'];
-const DEFAULT_BRANCH_TYPES = ['feature', 'fix', 'hotfix', 'epic'];
+const DEFAULT_BRANCH_TYPES = ['feature', 'fix', 'hotfix', 'epic', 'docs', 'ci', 'perf'];
 
 export function userConfigPath(env = process.env, platform = process.platform) {
   if (platform === 'win32') {
