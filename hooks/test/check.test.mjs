@@ -133,7 +133,7 @@ test('timeout, xargs and eval wrappers are unwrapped', async () => {
 test('one state per distinct action cwd', async () => {
   const other = path.join(tmp, 'other');
   const exec = spy();
-  await run(`git commit -m "bad subject" && git -C ${other} commit -m "bad subject"`, { exec });
+  await run(`git commit -m "bad subject" && git -C '${other}' commit -m "bad subject"`, { exec });
   const cwds = new Set(exec.calls.map((c) => c[2]));
   assert.ok(cwds.has(repo) && cwds.has(other), [...cwds].join());
 });
