@@ -7,7 +7,8 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { commitMsg, prePush, installShims } from '../lib/githooks.mjs';
 
-const GUARD = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../guard.mjs');
+// The shims are POSIX sh scripts (Git for Windows runs them in its sh), so they carry forward slashes.
+const GUARD = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../guard.mjs').replace(/\\/g, '/');
 const ZERO = '0'.repeat(40);
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gwg-githooks-'));
@@ -172,7 +173,7 @@ test('installShims upgrades an old pre-push shim in place', () => {
   assert.equal(fs.existsSync(path.join(hooks, 'pre-push.local')), false);
 });
 
-test('a chained pre-push hook that reads stdin does not hide refs from the guard', { skip: process.platform === 'win32' }, () => {
+test('a chained pre-push hook that reads stdin does not hide refs from the guard', () => {
   const remote = path.join(tmp, `remote${n++}.git`);
   spawnSync('git', ['init', '-q', '--bare', remote], { env: ENV });
   const dir = makeRepo({ commits: 3 });
@@ -196,7 +197,7 @@ test('installShims honours core.hooksPath', () => {
   assert.ok(fs.existsSync(path.join(dir, '.husky', 'pre-push')));
 });
 
-test('a real git commit is blocked by the installed shim', { skip: process.platform === 'win32' }, () => {
+test('a real git commit is blocked by the installed shim', () => {
   const dir = makeRepo();
   installShims(dir);
   const bad = git(dir, 'commit', '--allow-empty', '-m', 'Added x');
