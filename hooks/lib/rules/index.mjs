@@ -1,8 +1,9 @@
 // Rule engine: runs applicable rules over recognised actions.
 import { TEXT_RULES, checkCommitMessage } from './text.mjs';
+import { MERGE_RULES } from './merge.mjs';
 
 export { checkCommitMessage };
-export const RULES = [...TEXT_RULES];
+export const RULES = [...TEXT_RULES, ...MERGE_RULES];
 
 export async function evaluate(actions, ctx) {
   const findings = [];

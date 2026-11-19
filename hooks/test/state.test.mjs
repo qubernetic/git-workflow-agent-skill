@@ -36,6 +36,15 @@ test('prView without ref omits it', async () => {
   assert.deepEqual(f.calls[0].args.slice(0, 3), ['pr', 'view', '--json']);
 });
 
+test('prView passes --repo and keys the cache on it', async () => {
+  const f = fake(() => ({ code: 0, stdout: JSON.stringify({ number: 1 }) }));
+  const s = createState({ cwd: '/r', exec: f.exec });
+  await s.prView('1', 'o/r'); await s.prView('1', 'o/r'); await s.prView('1');
+  assert.equal(f.calls.length, 2);
+  assert.deepEqual(f.calls[0].args, ['pr', 'view', '1', '--repo', 'o/r', '--json', 'number,baseRefName,headRefName,body']);
+  assert.ok(!f.calls[1].args.includes('--repo'));
+});
+
 test('gh missing (ENOENT) resolves null', async () => {
   const f = fake(() => { const e = new Error('spawn gh ENOENT'); e.code = 'ENOENT'; throw e; });
   const s = createState({ cwd: '/r', exec: f.exec });

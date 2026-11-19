@@ -29,8 +29,9 @@ export function createState({ cwd, exec = defaultExec, timeoutMs = 3000 } = {}) 
       return r.code === 0 && r.stdout.trim() ? r.stdout.trim() : null;
     }),
     hasCommits: () => memo('hasCommits', async () => (await run('git', ['rev-parse', '--verify', '--quiet', 'HEAD'])).code === 0),
-    prView: (ref) => memo(`prView:${ref ?? ''}`, async () => {
-      const args = ['pr', 'view', ...(ref === undefined ? [] : [String(ref)]), '--json', 'number,baseRefName,headRefName,body'];
+    prView: (ref, repo) => memo(`prView:${ref ?? ''}:${repo ?? ''}`, async () => {
+      const args = ['pr', 'view', ...(ref === undefined ? [] : [String(ref)]),
+        ...(repo === undefined || repo === true ? [] : ['--repo', String(repo)]), '--json', 'number,baseRefName,headRefName,body'];
       const r = await run('gh', args);
       return r.code === 0 ? JSON.parse(r.stdout) : null;
     }),

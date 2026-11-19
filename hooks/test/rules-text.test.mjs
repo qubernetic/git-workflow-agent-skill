@@ -84,7 +84,7 @@ test('checkCommitMessage is shared and applies config', () => {
   assert.equal(checkCommitMessage('bad', { rules: { 'conventional-commit': 'off' } }).length, 0);
 });
 test('RULES ids', () => {
-  assert.deepEqual(RULES.map((r) => r.id), ['no-ai-attribution', 'conventional-commit', 'conventional-title', 'closes-one-per-line']);
+  assert.deepEqual(RULES.map((r) => r.id), ['no-ai-attribution', 'conventional-commit', 'conventional-title', 'closes-one-per-line', 'merge-method', 'merge-gate', 'test-plan-ticked']);
 });
 
 const editCtx = (view) => ({ ...ctx(), state: { currentBranch: async () => 'x', prView: async () => view } });
