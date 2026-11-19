@@ -233,3 +233,13 @@ test('install ignores a non-array harnesses list in the user config', () => {
   install({ harnesses: ['claude'], env });
   assert.deepEqual(readJson(userConfigPath(env)).harnesses, ['claude']);
 });
+
+test('disable without .git-workflow.json does not claim the guard is off', () => {
+  const env = makeEnv();
+  const dir = path.join(tmp, 'repo-nofile');
+  fs.mkdirSync(dir);
+  spawnSync('git', ['init', '-q'], { cwd: dir, env });
+  const [line] = disable({ cwd: dir });
+  assert.doesNotMatch(line, /inactive/);
+  assert.match(line, /scope all/);
+});

@@ -91,7 +91,7 @@ export function disable({ cwd = process.cwd() } = {}) {
   const root = findRepoRoot(cwd);
   if (!root) throw new Error(`${cwd} is not inside a git repository`);
   const file = path.join(root, '.git-workflow.json');
-  if (!fs.existsSync(file)) return [`${file} not present; guard already inactive here (scope opt-in)`];
+  if (!fs.existsSync(file)) return [`${file} not present; nothing to remove (with user scope all the guard still runs here)`];
   let empty = false;
   try {
     const v = JSON.parse(fs.readFileSync(file, 'utf8'));
