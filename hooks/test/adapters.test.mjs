@@ -23,7 +23,7 @@ const mkRepo = (name, optIn = true) => {
 const repo = mkRepo('repo');
 const plain = mkRepo('plain', false);
 const env = { XDG_CONFIG_HOME: xdg, APPDATA: xdg, HOME: tmp };
-const fixture = (name) => JSON.parse(fs.readFileSync(path.join(here, 'fixtures', name), 'utf8').replaceAll('__CWD__', repo));
+const fixture = (name) => JSON.parse(fs.readFileSync(path.join(here, 'fixtures', name), 'utf8').replaceAll('__CWD__', JSON.stringify(repo).slice(1, -1)));
 
 const PR = JSON.stringify({ number: 5, baseRefName: 'develop', headRefName: 'feature/1-x', body: '## Test plan\n- [x] a\n' });
 const exec = async (cmd, args) => {
