@@ -16,11 +16,15 @@ async function readStdin() {
 
 const warn = (msg) => process.stderr.write(`git-workflow guard: ${msg}\n`);
 
-// Hook subcommands never exit non-zero; any failure means allow.
+// Hook subcommands never exit non-zero; any failure means allow. An unknown harness or event
+// (for example a stale registration) also allows: exit 2 would block every tool call in Claude Code.
 async function hook([harness, event]) {
-  const adapter = ADAPTERS[harness];
-  const fn = adapter && EVENTS[event];
-  if (!fn) { process.stderr.write('usage: guard.mjs hook <claude|codex> <pre-tool-use|session-start>\n'); return 2; }
+  const adapter = Object.hasOwn(ADAPTERS, harness ?? '') ? ADAPTERS[harness] : null;
+  const fn = adapter && Object.hasOwn(EVENTS, event ?? '') ? EVENTS[event] : null;
+  if (!fn) {
+    warn(`unknown hook ${harness ?? ''} ${event ?? ''} (expected hook <claude|codex> <pre-tool-use|session-start>); allowing`);
+    return 0;
+  }
   try {
     let input;
     try { input = JSON.parse(await readStdin()); } catch (e) { warn(`malformed hook input (${e.message}); allowing`); return 0; }

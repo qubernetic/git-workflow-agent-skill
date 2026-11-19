@@ -131,3 +131,13 @@ test('subprocess: unknown subcommand exits 2 with usage', () => {
   assert.equal(r.status, 2);
   assert.match(r.stderr, /usage/);
 });
+
+test('subprocess: unknown hook harness or event fails open with one stderr line', () => {
+  for (const args of [['hook', 'cursor', 'pre-tool-use'], ['hook', 'claude', 'post-tool-use'], ['hook']]) {
+    const r = spawn(args, JSON.stringify(fixture('claude-bash-attribution.json')));
+    assert.equal(r.status, 0, args.join(' '));
+    assert.equal(r.stdout, '', args.join(' '));
+    assert.equal(r.stderr.trim().split('\n').length, 1, r.stderr);
+    assert.match(r.stderr, /^git-workflow guard: unknown hook/);
+  }
+});
