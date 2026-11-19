@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 
-const FETCH_TIMEOUT_MS = 10000;
+const FETCH_TIMEOUT_MS = 5000;
+const isOption = (v) => typeof v === 'string' && v.startsWith('-');
 
 // Resolves {code, stdout, stderr} for any process that ran to completion (including
 // non-zero exit). Rejects when the process cannot start or is killed by timeout.
@@ -29,7 +30,9 @@ export function createState({ cwd, exec = defaultExec, timeoutMs = 3000 } = {}) 
       return r.code === 0 && r.stdout.trim() ? r.stdout.trim() : null;
     }),
     hasCommits: () => memo('hasCommits', async () => (await run('git', ['rev-parse', '--verify', '--quiet', 'HEAD'])).code === 0),
+    // Refs or repos that look like options are never passed to gh.
     prView: (ref, repo) => memo(`prView:${ref ?? ''}:${repo ?? ''}`, async () => {
+      if (isOption(String(ref ?? '')) || isOption(repo)) return null;
       const args = ['pr', 'view', ...(ref === undefined ? [] : [String(ref)]),
         ...(repo === undefined || repo === true ? [] : ['--repo', String(repo)]), '--json', 'number,baseRefName,headRefName,body'];
       const r = await run('gh', args);
@@ -37,9 +40,22 @@ export function createState({ cwd, exec = defaultExec, timeoutMs = 3000 } = {}) 
     }),
     issueState: (n) => memo(`issueState:${n}`, async () => {
       const r = await run('gh', ['issue', 'view', String(n), '--json', 'state']);
-      if (r.code !== 0) return /could not resolve|not found/i.test(r.stderr ?? '') ? 'MISSING' : null;
+      // Only an explicit "no such issue" is MISSING; repository or auth errors are unknown.
+      if (r.code !== 0) return /could not resolve to an issue|no issue found|issue .*not found/i.test(r.stderr ?? '') ? 'MISSING' : null;
       const state = JSON.parse(r.stdout).state;
       return state === 'OPEN' || state === 'CLOSED' ? state : null;
+    }),
+    // true/false when the local branch exists or not; null when git fails otherwise.
+    branchExists: (name) => memo(`branchExists:${name}`, async () => {
+      if (typeof name !== 'string' || !name || isOption(name)) return null;
+      const r = await run('git', ['show-ref', '--verify', '--quiet', `refs/heads/${name}`]);
+      return r.code === 0 ? true : r.code === 1 ? false : null;
+    }),
+    defaultBranch: (repo) => memo(`defaultBranch:${repo ?? ''}`, async () => {
+      if (isOption(repo)) return null;
+      const r = await run('gh', ['repo', 'view', ...(typeof repo === 'string' ? [repo] : []), '--json', 'defaultBranchRef']);
+      const name = r.code === 0 ? JSON.parse(r.stdout)?.defaultBranchRef?.name : null;
+      return typeof name === 'string' && name ? name : null;
     }),
     behindRemote: (branch) => memo(`behindRemote:${branch}`, async () => {
       const f = await run('git', ['fetch', 'origin', branch, '--quiet'], FETCH_TIMEOUT_MS);

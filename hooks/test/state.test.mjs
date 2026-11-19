@@ -94,14 +94,52 @@ test('issueState maps OPEN/CLOSED, MISSING when absent, null when unknown', asyn
   assert.equal(await createState({ cwd: '/r', exec: f.exec }).issueState(7), null);
   f = fake(() => ({ code: 1, stdout: '' }));
   assert.equal(await createState({ cwd: '/r', exec: f.exec }).issueState(7), null);
+  f = fake(() => ({ code: 1, stdout: '', stderr: "GraphQL: Could not resolve to a Repository with the name 'o/r'. (repository)" }));
+  assert.equal(await createState({ cwd: '/r', exec: f.exec }).issueState(7), null);
+  f = fake(() => ({ code: 1, stdout: '', stderr: 'no issue found for 7' }));
+  assert.equal(await createState({ cwd: '/r', exec: f.exec }).issueState(7), 'MISSING');
 });
 
-test('behindRemote fetches once with 10s timeout, then counts', async () => {
+test('prView never passes a ref or repo starting with a dash', async () => {
+  const f = fake(() => ({ code: 0, stdout: JSON.stringify({ number: 1 }) }));
+  const s = createState({ cwd: '/r', exec: f.exec });
+  assert.equal(await s.prView('--web'), null);
+  assert.equal(await s.prView('1', '-x'), null);
+  assert.equal(f.calls.length, 0);
+});
+
+test('branchExists: true on 0, false on 1, null on error; ref is verified, dash names skip', async () => {
+  let f = fake(() => ({ code: 0, stdout: '' }));
+  const s = createState({ cwd: '/r', exec: f.exec });
+  assert.equal(await s.branchExists('develop'), true);
+  assert.deepEqual(f.calls[0].args, ['show-ref', '--verify', '--quiet', 'refs/heads/develop']);
+  await s.branchExists('develop');
+  assert.equal(f.calls.length, 1);
+  assert.equal(await createState({ cwd: '/r', exec: fake(() => ({ code: 1, stdout: '' })).exec }).branchExists('x'), false);
+  assert.equal(await createState({ cwd: '/r', exec: fake(() => ({ code: 128, stdout: '' })).exec }).branchExists('x'), null);
+  assert.equal(await createState({ cwd: '/r', exec: fake(() => { throw new Error('x'); }).exec }).branchExists('x'), null);
+});
+
+test('defaultBranch reads defaultBranchRef, with --repo when given; null on failure', async () => {
+  const f = fake(() => ({ code: 0, stdout: '{"defaultBranchRef":{"name":"main"}}' }));
+  const s = createState({ cwd: '/r', exec: f.exec });
+  assert.equal(await s.defaultBranch(), 'main');
+  assert.deepEqual(f.calls[0].args, ['repo', 'view', '--json', 'defaultBranchRef']);
+  assert.equal(await s.defaultBranch('o/r'), 'main');
+  assert.deepEqual(f.calls[1].args, ['repo', 'view', 'o/r', '--json', 'defaultBranchRef']);
+  await s.defaultBranch();
+  assert.equal(f.calls.length, 2);
+  assert.equal(await createState({ cwd: '/r', exec: fake(() => ({ code: 1, stdout: '' })).exec }).defaultBranch(), null);
+  assert.equal(await createState({ cwd: '/r', exec: fake(() => ({ code: 0, stdout: '{}' })).exec }).defaultBranch(), null);
+  assert.equal(await s.defaultBranch('-x'), null);
+});
+
+test('behindRemote fetches once with 5s timeout, then counts', async () => {
   const f = fake((cmd, args) => args[0] === 'fetch' ? { code: 0, stdout: '' } : { code: 0, stdout: '3\n' });
   const s = createState({ cwd: '/r', exec: f.exec });
   assert.equal(await s.behindRemote('develop'), 3);
   assert.deepEqual(f.calls[0].args, ['fetch', 'origin', 'develop', '--quiet']);
-  assert.equal(f.calls[0].opts.timeoutMs, 10000);
+  assert.equal(f.calls[0].opts.timeoutMs, 5000);
   assert.deepEqual(f.calls[1].args, ['rev-list', '--count', 'develop..origin/develop']);
   assert.equal(f.calls[1].opts.timeoutMs, 3000);
   await s.behindRemote('develop');
