@@ -24,8 +24,8 @@ function codexFeatureEnabled(env) {
   } catch { return false; }
 }
 
-export function install({ scope = 'opt-in', harnesses, env = process.env } = {}) {
-  if (scope !== 'opt-in' && scope !== 'all') throw new Error(`invalid scope ${JSON.stringify(scope)}; use opt-in or all`);
+export function install({ scope, harnesses, env = process.env } = {}) {
+  if (scope !== undefined && scope !== 'opt-in' && scope !== 'all') throw new Error(`invalid scope ${JSON.stringify(scope)}; use opt-in or all`);
   const lines = [];
   const registered = [];
   for (const name of harnesses ?? Object.keys(HARNESSES)) {
@@ -44,10 +44,16 @@ export function install({ scope = 'opt-in', harnesses, env = process.env } = {})
     }
   }
   const file = userConfigPath(env);
-  const cfg = { scope, version: skillVersion(), guardPath: GUARD_PATH, harnesses: registered };
+  const existing = readUserConfig(env).value;
+  const kept = scope === undefined && (existing?.scope === 'all' || existing?.scope === 'opt-in');
+  const finalScope = scope ?? (kept ? existing.scope : 'opt-in');
+  const cfg = {
+    scope: finalScope, version: skillVersion(), guardPath: GUARD_PATH,
+    harnesses: [...new Set([...(existing?.harnesses ?? []), ...registered])],
+  };
   writeFileThrough(file, `${JSON.stringify(cfg, null, 2)}\n`);
-  lines.push(`user config written to ${file} (scope: ${scope})`);
-  if (scope === 'opt-in') {
+  lines.push(`user config written to ${file} (scope: ${finalScope}${kept ? ', kept' : ''})`);
+  if (finalScope === 'opt-in') {
     lines.push(`to enable the guard in a repository, run there: node "${GUARD_PATH}" enable [--git-hooks]`);
   }
   return lines;

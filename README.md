@@ -124,7 +124,7 @@ The install scripts register the guard right after the skill symlink when `node`
 .\scripts\install_windows.ps1 -Scope all   # -NoHooks and -Uninstall work too
 ```
 
-You can also ask Claude Code ("install the guard", "is the guard working?") or run the guard directly: `node hooks/guard.mjs install|update|doctor|repair|uninstall|enable|disable`. `install` accepts `--scope opt-in|all` and `--harness claude,codex`. Run `doctor` to check the registration.
+You can also ask Claude Code ("install the guard", "is the guard working?") or run the guard directly: `node hooks/guard.mjs install|update|doctor|repair|uninstall|enable|disable`. `install` accepts `--scope opt-in|all` and `--harness claude,codex`. Re-running `install` without `--scope` keeps the scope you chose earlier. Run `doctor` to check the registration.
 
 ### Scope and per-repository config
 

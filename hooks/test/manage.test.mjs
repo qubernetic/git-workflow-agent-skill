@@ -194,3 +194,34 @@ test('guard.mjs dispatches the management commands', () => {
   assert.equal(r.status, 0, r.stderr);
   assert.ok(fs.existsSync(userConfigPath(env)));
 });
+
+test('install without --scope keeps the configured scope', () => {
+  const env = makeEnv();
+  install({ scope: 'all', env });
+  const lines = install({ env });
+  assert.equal(readJson(userConfigPath(env)).scope, 'all');
+  assert.ok(lines.some((l) => /scope: all, kept/.test(l)));
+});
+
+test('install with an explicit scope overrides the configured one', () => {
+  const env = makeEnv();
+  install({ scope: 'all', env });
+  install({ scope: 'opt-in', env });
+  assert.equal(readJson(userConfigPath(env)).scope, 'opt-in');
+});
+
+test('install defaults to opt-in with no config or an invalid scope', () => {
+  const env = makeEnv();
+  install({ env });
+  assert.equal(readJson(userConfigPath(env)).scope, 'opt-in');
+  fs.writeFileSync(userConfigPath(env), '{"scope":"bogus"}');
+  install({ env });
+  assert.equal(readJson(userConfigPath(env)).scope, 'opt-in');
+});
+
+test('install keeps harnesses from earlier runs', () => {
+  const env = makeEnv();
+  install({ harnesses: ['claude'], env });
+  install({ harnesses: ['codex'], env });
+  assert.deepEqual(readJson(userConfigPath(env)).harnesses.sort(), ['claude', 'codex']);
+});

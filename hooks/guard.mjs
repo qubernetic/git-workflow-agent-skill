@@ -82,7 +82,7 @@ const COMMANDS = {
   hook,
   git: gitHook,
   install: manageCmd((a) => manage.install({
-    scope: flag(a, '--scope') ?? 'opt-in',
+    scope: flag(a, '--scope'),
     harnesses: flag(a, '--harness')?.split(',').filter(Boolean),
   })),
   uninstall: manageCmd(() => manage.uninstall()),
