@@ -104,3 +104,9 @@ test('pr edit fails open on suffix when prView is unknown, still checks subject'
 test('pr edit exempts release head', async () => {
   assert.equal(await one(edit('chore(release): prepare 1.5.0'), editCtx({ headRefName: 'release/1.5.0', baseRefName: 'main' })), null);
 });
+test('pr edit passes its repo flag to prView', async () => {
+  let seen;
+  const c = { ...ctx(), state: { currentBranch: async () => 'x', prView: async (...a) => { seen = a; return null; } } };
+  await run({ ...pr({ title: 'feat: x' }, { repo: 'o/r' }, 'pr edit'), positionals: ['12'] }, c);
+  assert.deepEqual(seen, ['12', 'o/r']);
+});

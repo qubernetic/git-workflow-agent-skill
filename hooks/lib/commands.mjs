@@ -16,6 +16,7 @@
 //                     -t subject (NOT title), -b body, -B base, -H head, -F body-file
 //     gh pr create/edit, gh issue create/edit:
 //                     -t title, -b body, -B base, -H head, -F body-file
+//     every gh sub  : -R repo (also accepted before the group and between group and verb)
 //     git commit    : -m message, -F file, -n no-verify, -a all
 //     git push      : -f force, -d delete, -u set-upstream
 //     git tag       : -m message, -F file
@@ -25,7 +26,7 @@
 import { readFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 
-const GH_TEXT = { t: 'title', b: 'body', B: 'base', H: 'head', F: 'body-file' };
+const GH_TEXT = { t: 'title', b: 'body', B: 'base', H: 'head', F: 'body-file', R: 'repo' };
 const ALIASES = {
   'git commit': { m: 'message', F: 'file', n: 'no-verify', a: 'all' },
   'git tag': { m: 'message', F: 'file' },
@@ -38,7 +39,7 @@ const ALIASES = {
 };
 
 // Canonical flag names (post-alias) that consume a value, per sub.
-const gh = ['title', 'body', 'body-file', 'base', 'head', 'repo', 'R', 'a', 'assignee', 'l', 'label',
+const gh = ['title', 'body', 'body-file', 'base', 'head', 'repo', 'a', 'assignee', 'l', 'label',
   'm', 'milestone', 'p', 'project', 'r', 'reviewer', 'T', 'template', 'add-label', 'remove-label',
   'add-assignee', 'remove-assignee', 'add-reviewer', 'remove-reviewer', 'add-project',
   'remove-project', 'remove-milestone'];
@@ -53,7 +54,7 @@ const VALUE_FLAGS = {
   'git worktree': ['b', 'B', 'reason'],
   'git tag': ['m', 'message', 'F', 'file', 'u', 'local-user', 'contains', 'no-contains', 'merged',
     'no-merged', 'points-at', 'sort', 'format'],
-  'gh pr merge': ['subject', 'body', 'body-file', 'A', 'author-email', 'match-head-commit', 'repo', 'R'],
+  'gh pr merge': ['subject', 'body', 'body-file', 'A', 'author-email', 'match-head-commit', 'repo'],
   'gh pr create': gh,
   'gh pr edit': gh,
   'gh issue create': gh,
@@ -92,6 +93,21 @@ function skipGitGlobals(argv, cwd) {
     else break;
   }
   return { i, cwd };
+}
+
+// gh [-R|--repo X] <group> [-R|--repo X] <verb> ... -> {words: [group, verb], rest, repo}.
+function skipGhRepo(argv) {
+  const words = [];
+  let repo;
+  let i = 1;
+  while (i < argv.length && words.length < 2) {
+    const a = argv[i];
+    if (a === '-R' || a === '--repo') { repo = argv[i + 1] ?? true; i += 2; }
+    else if (a.startsWith('--repo=')) { repo = a.slice(7); i += 1; }
+    else if (/^-R./.test(a)) { repo = a.slice(2); i += 1; }
+    else { words.push(a); i += 1; }
+  }
+  return { words, rest: argv.slice(i), repo };
 }
 
 function parseArgs(args, key) {
@@ -137,6 +153,7 @@ export function recognise(cmd, readFile = defaultReadFile) {
   let cwd = cmd.cwd;
   let sub;
   let rest;
+  let ghRepo;
   if (tool === 'git') {
     const g = skipGitGlobals(argv, cwd);
     cwd = g.cwd;
@@ -144,12 +161,15 @@ export function recognise(cmd, readFile = defaultReadFile) {
     sub = argv[g.i];
     rest = argv.slice(g.i + 1);
   } else if (tool === 'gh') {
-    if (!GH_SUBS[argv[1]]?.has(argv[2])) return null;
-    sub = `${argv[1]} ${argv[2]}`;
-    rest = argv.slice(3);
+    const g = skipGhRepo(argv);
+    if (!GH_SUBS[g.words[0]]?.has(g.words[1])) return null;
+    sub = `${g.words[0]} ${g.words[1]}`;
+    rest = g.rest;
+    ghRepo = g.repo;
   } else return null;
 
   const { flags, positionals } = parseArgs(rest, `${tool} ${sub}`);
+  if (ghRepo !== undefined && !flags.has('repo')) flags.set('repo', ghRepo);
   const fileText = (p) => {
     if (p === '-') return cmd.stdin ?? null;
     return readFile(resolveDir(p, cwd));

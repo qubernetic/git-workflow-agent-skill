@@ -161,6 +161,8 @@ test('pr-base without --base uses the repository default branch', async () => {
   assert.deepEqual(await ids('gh pr create', cfg('feature/9-x', null)), []);
   assert.deepEqual(await ids('gh pr create', cfg('hotfix/9-x', 'main')), []);
   assert.deepEqual(repos, [undefined, undefined, undefined]);
+  assert.deepEqual(await ids('gh pr create -R o/r', cfg('feature/9-x', 'main')), ['pr-base:deny']);
+  assert.equal(repos.at(-1), 'o/r');
 });
 
 test('pr-base', async () => {

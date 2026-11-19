@@ -101,7 +101,7 @@ const conventionalTitle = {
     if (a.sub === 'pr create') {
       head = a.flags.get('head') ?? (await ctx.state.currentBranch());
     } else {
-      const view = await ctx.state.prView(a.positionals[0]);
+      const view = await ctx.state.prView(a.positionals[0], a.flags.get('repo'));
       head = view?.headRefName;
       if (typeof base !== 'string') base = view?.baseRefName;
     }

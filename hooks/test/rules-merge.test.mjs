@@ -66,3 +66,11 @@ test('repo flag is passed to prView', async () => {
 test('non-merge actions are ignored', async () => {
   assert.deepEqual(await rules(merge({}, { sub: 'pr view' }), ctx()), []);
 });
+
+test('gh -R before the group reaches prView as repo', async () => {
+  const { recognise } = await import('../lib/commands.mjs');
+  let seen;
+  const c = ctx(PR, { state: { prView: async (...a) => { seen = a; return null; } } });
+  await evaluate([recognise({ argv: ['gh', '-R', 'o/r', 'pr', 'merge', '42', '--merge'], env: {}, cwd: '/r', raw: '' })], c);
+  assert.deepEqual(seen, ['42', 'o/r']);
+});

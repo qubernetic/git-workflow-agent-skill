@@ -9,7 +9,7 @@ const finding = (rule, decision, what, instead) => ({
 
 const isMerge = (a) => a.tool === 'gh' && a.sub === 'pr merge';
 const prRef = (a) => a.positionals[0];
-const loadPr = (a, ctx) => ctx.state.prView(prRef(a), a.flags.get('repo') ?? a.flags.get('R'));
+const loadPr = (a, ctx) => ctx.state.prView(prRef(a), a.flags.get('repo'));
 
 const mergeMethod = {
   id: 'merge-method',

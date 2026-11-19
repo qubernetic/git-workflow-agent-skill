@@ -175,3 +175,18 @@ test('git global options with separate values: --attr-source consumes, --exec-pa
   assert.equal(rec('git --exec-path commit -m x').sub, 'commit');
   assert.equal(rec('git --namespace ns --work-tree /w push origin a').sub, 'push');
 });
+
+test('gh -R/--repo is accepted before the group and between group and verb', () => {
+  for (const src of ['gh -R o/r pr merge 5 --squash', 'gh pr -R o/r merge 5 --squash', 'gh --repo o/r pr merge 5 --squash',
+    'gh --repo=o/r pr merge 5 --squash', 'gh pr --repo o/r merge 5 --squash', 'gh pr merge 5 --squash -R o/r']) {
+    const a = rec(src);
+    assert.equal(a?.sub, 'pr merge', src);
+    assert.equal(a.flags.get('repo'), 'o/r', src);
+    assert.equal(a.flags.has('squash'), true, src);
+    assert.deepEqual(a.positionals, ['5'], src);
+    assert.equal(a.flags.has('R'), false, src);
+  }
+  assert.equal(rec('gh pr create -R o/r -t "feat: x"').flags.get('repo'), 'o/r');
+  assert.equal(rec('gh issue edit 3 -R o/r').flags.get('repo'), 'o/r');
+  assert.equal(rec('gh -R o/r auth status'), null);
+});
