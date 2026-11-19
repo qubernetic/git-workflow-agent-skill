@@ -1,6 +1,6 @@
 name: Feature Request
 description: Suggest a new workflow rule, decision guide, or improvement
-title: "[Feature]: "
+title: "feat: "
 labels: ["enhancement"]
 body:
   - type: markdown

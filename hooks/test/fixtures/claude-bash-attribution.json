@@ -1,0 +1,1 @@
+{"hook_event_name":"PreToolUse","cwd":"__CWD__","permission_mode":"default","tool_name":"Bash","tool_input":{"command":"git commit -m \"feat: add x\" -m \"Co-Authored-By: Claude <noreply@anthropic.com>\""}}

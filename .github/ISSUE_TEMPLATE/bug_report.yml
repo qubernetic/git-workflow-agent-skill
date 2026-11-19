@@ -1,6 +1,6 @@
 name: Bug Report
 description: The skill produced incorrect git behavior
-title: "[Bug]: "
+title: "fix: "
 labels: ["bug"]
 body:
   - type: markdown

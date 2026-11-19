@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A Claude Code **skill** (SKILL.md) that enforces a strict Gitflow-based development workflow. It governs how commits are written, branches are created, PRs are opened, and releases are managed.
 
-This is not a runnable application — it's a single `SKILL.md` file that instructs Claude Code to follow disciplined git practices.
+The skill itself is a single `SKILL.md` file that instructs Claude Code to follow disciplined git practices. An optional Node.js guard under `hooks/` enforces the mechanical rules as agent and git hooks; the skill works without it.
 
 ## Workflow
 
@@ -16,6 +16,7 @@ This repo follows the same Gitflow workflow described in SKILL.md. Apply the ski
 
 - **SKILL.md** — The entire skill definition. Self-contained installable artifact. Contains YAML frontmatter (`name`, `description`, `version`, `metadata`) followed by the complete workflow specification: branch model, commit format, issue-driven flow, semantic versioning, release process, and forbidden operations.
 - **`scripts/`** — Tooling: `lint.sh` (structural validation of SKILL.md), `install_linux.sh`, `install_macos.sh`, `install_windows.ps1` (platform-specific install/uninstall via symlink).
+- **`hooks/`** — Optional enforcement guard (Node ≥ 20, ESM `.mjs`, no dependencies). `guard.mjs` is the entry point (`hook`, `git`, `install`, `update`, `doctor`, `repair`, `uninstall`, `enable`, `disable`); `lib/` holds rules (`lib/rules/`), harness adapters (`lib/adapters/`) and install/doctor logic (`lib/manage/`); `git/` holds the `commit-msg` and `pre-push` shims; `test/` runs with `node --test hooks/test/`. SKILL.md stays self-contained and describes the guard as optional.
 - **`.github/`** — PR template, issue templates (bug report, feature request), and GitHub Actions workflows (`lint.yml`, `close-linked-issues.yml`).
 
 ## Key Invariants
@@ -39,6 +40,7 @@ When modifying SKILL.md, preserve these non-negotiable rules:
 ## Testing Changes
 
 1. Run the linter: `./scripts/lint.sh`
-2. Install the updated skill: `./scripts/install_linux.sh` (or platform equivalent)
-3. Start a new Claude Code session
-4. Ask Claude to perform git operations and verify it follows the workflow
+2. Run the guard tests: `node --test hooks/test/`
+3. Install the updated skill: `./scripts/install_linux.sh` (or platform equivalent)
+4. Start a new Claude Code session
+5. Ask Claude to perform git operations and verify it follows the workflow
