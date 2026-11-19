@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `docs/*`, `ci/*` and `perf/*` working branches for single-type changes: base and merge target `develop` (or an epic), accepted by the guard's default `branchTypes` and `pr-base` table (#103)
+
 ## [1.5.0] - 2026-11-19
 
 ### Added
