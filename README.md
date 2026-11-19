@@ -97,7 +97,7 @@ Or invoke directly:
 
 | Rule | Description |
 |------|-------------|
-| **Gitflow branching** | `main`, `develop`, `feature/*`, `fix/*`, `hotfix/*`, `release/*`, `epic/*` |
+| **Gitflow branching** | `main`, `develop`, `feature/*`, `fix/*`, `docs/*`, `ci/*`, `perf/*`, `hotfix/*`, `release/*`, `epic/*` |
 | **Epics** | Multi-slice plans run on an `epic/*` branch; slices merge freely, one reviewed epic PR reaches `develop` |
 | **Conventional Commits** | Structured messages — `feat:`, `fix:`, `docs:`, `chore:`, etc. |
 | **Atomic commits** | One logical change per commit, no mixed concerns |
@@ -138,7 +138,7 @@ The scope lives in the user config (`$XDG_CONFIG_HOME/git-workflow-guard/config.
 ```json
 {
   "protectedBranches": ["main", "develop"],
-  "branchTypes": ["feature", "fix", "hotfix", "epic"],
+  "branchTypes": ["feature", "fix", "hotfix", "epic", "docs", "ci", "perf"],
   "attributionPatterns": [],
   "rules": { "merge-gate": "ask", "fresh-base": "warn", "tag-on-main": "off" }
 }
@@ -237,6 +237,9 @@ gitGraph
 |---------|------|-------------|---------|
 | `feature/<issue>-<slug>` | `develop` | `develop` | New features |
 | `fix/<issue>-<slug>` | `develop` | `develop` | Bug fixes |
+| `docs/<issue>-<slug>` | `develop` | `develop` | Documentation-only changes |
+| `ci/<issue>-<slug>` | `develop` | `develop` | CI pipeline changes |
+| `perf/<issue>-<slug>` | `develop` | `develop` | Performance improvements |
 | `hotfix/<issue>-<slug>` | `main` | `main` + `develop` | Urgent production fixes |
 | `release/<version>` | `develop` | `main` + `develop` | Release preparation |
 | `epic/<issue>-<slug>` | `develop` | `develop` | Plan of two or more slices; slice branches use the epic as base |

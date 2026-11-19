@@ -91,6 +91,13 @@ test('branch-name', async () => {
   assert.deepEqual(await ids('git switch -c release/1.2'), ['branch-name:deny']);
 });
 
+test('branch-name accepts docs, ci and perf branches by default', async () => {
+  const defaults = ctx({}, { branchTypes: undefined });
+  for (const t of ['docs', 'ci', 'perf']) {
+    assert.deepEqual(await ids(`git checkout -b ${t}/7-update-guide`, defaults), []);
+  }
+  assert.deepEqual(await ids('git checkout -b chore/7-x', defaults), ['branch-name:deny']);
+});
 test('branch-name allows creating a protected branch by name', async () => {
   for (const line of ['git checkout -b develop', 'git checkout -b develop origin/develop', 'git switch -c main']) {
     assert.deepEqual(await ids(line, ctx({ behindRemote: async () => 0 })), [], line);
@@ -189,6 +196,11 @@ test('pr-base', async () => {
   assert.deepEqual(await ids('gh pr create --base main', cfg('main')), ['pr-base:deny']);
   assert.deepEqual(await ids('gh pr create --head hotfix/9-x --base main', cfg('feature/1-a')), []);
   assert.deepEqual(await ids('gh pr create --base main', cfg(null)), []);
+  for (const t of ['docs', 'ci', 'perf']) {
+    assert.deepEqual(await ids('gh pr create --base develop', cfg(`${t}/7-x`)), []);
+    assert.deepEqual(await ids('gh pr create -B epic/3-y', cfg(`${t}/7-x`)), []);
+    assert.deepEqual(await ids('gh pr create --base main', cfg(`${t}/7-x`)), ['pr-base:deny']);
+  }
 });
 
 test('tag-on-main', async () => {

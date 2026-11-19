@@ -55,7 +55,7 @@ test('opt-in with empty .git-workflow.json: active with defaults', () => {
   assert.equal(c.scope, 'opt-in');
   assert.equal(c.repoRoot, r);
   assert.deepEqual(c.protectedBranches, ['main', 'develop']);
-  assert.deepEqual(c.branchTypes, ['feature', 'fix', 'hotfix', 'epic']);
+  assert.deepEqual(c.branchTypes, ['feature', 'fix', 'hotfix', 'epic', 'docs', 'ci', 'perf']);
   assert.deepEqual(c.rules, {});
   assert.deepEqual(c.attributionPatterns, []);
   assert.deepEqual(c.warnings, []);
