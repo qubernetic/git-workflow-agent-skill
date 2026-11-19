@@ -47,7 +47,7 @@ test('runCheck: "on" denies attribution; raw fallback honours warn and off', asy
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'guard-levels-'));
   const repo = path.join(tmp, 'repo');
   fs.mkdirSync(path.join(repo, '.git'), { recursive: true });
-  const env = { XDG_CONFIG_HOME: path.join(tmp, 'xdg'), HOME: tmp };
+  const env = { XDG_CONFIG_HOME: path.join(tmp, 'xdg'), APPDATA: path.join(tmp, 'xdg'), HOME: tmp, USERPROFILE: tmp };
   const exec = async () => ({ code: 1, stdout: '', stderr: '' });
   const run = (command, rules) => {
     fs.writeFileSync(path.join(repo, '.git-workflow.json'), JSON.stringify({ rules }));

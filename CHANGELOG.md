@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `docs/*`, `ci/*` and `perf/*` working branches for single-type changes: base and merge target `develop` (or an epic), accepted by the guard's default `branchTypes` and `pr-base` table (#103)
 - Small-issue bundles: two or three small, related issues may share one branch and one PR, with atomic commits per issue and one `Closes #N` line each (#98)
 
+### Fixed
+
+- Guard rough edges: uninstall no longer leaves an empty `"hooks": {}`, install backs up an unparsable user config like repair, a non-array `harnesses` value is ignored, `/cygdrive/<drive>/` paths map on Windows, bash installers reject an invalid `--scope` (#110)
+
 ## [1.5.0] - 2026-11-19
 
 ### Added

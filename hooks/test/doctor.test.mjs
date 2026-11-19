@@ -64,6 +64,17 @@ test('registered path pointing to a deleted file fails claude-path; repair fixes
   assert.ok(after.hooks.PreToolUse.some((e) => e.hooks[0].command === 'echo foreign'), 'foreign entry kept');
 });
 
+test('repair ignores a non-array harnesses list', () => {
+  const env = makeEnv();
+  install({ scope: 'all', env });
+  const file = userConfigPath(env);
+  fs.writeFileSync(file, JSON.stringify({ scope: 'all', harnesses: 'claude' }));
+  repair({ env });
+  const { harnesses } = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.ok(Array.isArray(harnesses));
+  assert.ok(!harnesses.includes('c'), JSON.stringify(harnesses));
+});
+
 test('repair backs up an invalid user config before rewriting it', () => {
   const env = makeEnv();
   install({ scope: 'all', env });
