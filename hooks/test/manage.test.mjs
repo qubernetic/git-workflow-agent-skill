@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { HARNESSES, register, unregister } from '../lib/manage/registry.mjs';
 import { install, uninstall, enable, disable } from '../lib/manage/commands.mjs';
 import { userConfigPath } from '../lib/config.mjs';
@@ -188,7 +189,7 @@ test('enable creates .git-workflow.json and shims; disable removes only an empty
 
 test('guard.mjs dispatches the management commands', () => {
   const env = makeEnv();
-  const g = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../guard.mjs');
+  const g = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../guard.mjs');
   const r = spawnSync(process.execPath, [g, 'install'], { env, encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
   assert.ok(fs.existsSync(userConfigPath(env)));
