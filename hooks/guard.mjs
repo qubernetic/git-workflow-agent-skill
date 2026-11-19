@@ -2,6 +2,7 @@
 // git-workflow guard entry point: node hooks/guard.mjs <subcommand> ...
 import * as claude from './lib/adapters/claude.mjs';
 import * as codex from './lib/adapters/codex.mjs';
+import { commitMsg, prePush } from './lib/githooks.mjs';
 
 const ADAPTERS = { claude, codex };
 const EVENTS = { 'pre-tool-use': 'preToolUse', 'session-start': 'sessionStart' };
@@ -32,8 +33,23 @@ async function hook([harness, event]) {
   return 0;
 }
 
-// Later tasks add: git, install, update, doctor, repair, uninstall, enable, disable.
-const COMMANDS = { hook };
+// Git hook subcommands: exit 1 only for a rule violation; failures fail open.
+async function gitHook([name, ...args]) {
+  try {
+    let r;
+    if (name === 'commit-msg') r = commitMsg(args[0], { cwd: process.cwd() });
+    else if (name === 'pre-push') r = prePush(await readStdin(), { cwd: process.cwd() });
+    else { process.stderr.write('usage: guard.mjs git <commit-msg|pre-push> [args]\n'); return 2; }
+    if (r.stderr) process.stderr.write(r.stderr);
+    return r.exitCode;
+  } catch (e) {
+    warn(`git hook failed (${e?.message ?? e}); allowing`);
+    return 0;
+  }
+}
+
+// Later tasks add: install, update, doctor, repair, uninstall, enable, disable.
+const COMMANDS = { hook, git: gitHook };
 
 const [sub, ...rest] = process.argv.slice(2);
 if (!COMMANDS[sub]) {
