@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from './config.mjs';
 import { checkCommitMessage } from './rules/text.mjs';
+import { levelDecision } from './rules/levels.mjs';
 
 const GUARD = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../guard.mjs').replace(/\\/g, '/');
 const HOOK_NAMES = ['commit-msg', 'pre-push'];
@@ -14,7 +15,7 @@ const PREFIX = 'git-workflow guard: ';
 
 const line = (msg) => (msg.startsWith(PREFIX) ? msg : PREFIX + msg);
 
-// Findings -> {exitCode, stderr}. warn passes with output; everything else (deny, ask, on) blocks.
+// Findings -> {exitCode, stderr}. warn passes with output; deny blocks.
 function verdict(findings, warnings = []) {
   const lines = warnings.map((w) => line(String(w).replace(/^git-workflow guard:\s*/, '')));
   let exitCode = 0;
@@ -41,12 +42,11 @@ export function commitMsg(file, { cwd = process.cwd() } = {}) {
   }
 }
 
-const level = (config, id) => config.rules?.[id];
-
+// Git hooks cannot ask: a configured `ask` blocks like `deny`.
 function finding(config, rule, what, instead) {
-  const lv = level(config, rule);
-  if (lv === 'off') return null;
-  return { rule, decision: lv && lv !== 'on' ? lv : 'deny', message: `${PREFIX}${rule}: ${what}. ${instead}.` };
+  const decision = levelDecision(config.rules?.[rule], 'deny', false);
+  if (decision === null) return null;
+  return { rule, decision, message: `${PREFIX}${rule}: ${what}. ${instead}.` };
 }
 
 export function prePush(stdinText, { cwd = process.cwd() } = {}) {

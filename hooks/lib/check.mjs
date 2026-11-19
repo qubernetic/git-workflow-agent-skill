@@ -6,6 +6,7 @@ import { loadConfig } from './config.mjs';
 import { createState } from './state.mjs';
 import { evaluate } from './rules/index.mjs';
 import { attributionFinding } from './rules/text.mjs';
+import { withLevel } from './rules/levels.mjs';
 
 const GIT_OR_GH = /\b(git|gh)\b/;
 const MAX_DEPTH = 3;
@@ -76,24 +77,23 @@ function expand(cmd, depth, out) {
 
 const MERGE_FALLBACK = /gh\s+pr\s+merge\b[^\n]*--(squash|rebase|admin)\b/;
 
-// Raw-text scan used when the command cannot be parsed (spec 6.4).
-function rawFallback(text, config) {
+// Raw-text scan used when the command cannot be parsed (spec 6.4). Rule levels apply.
+function rawFallback(text, config, askSupported) {
   const found = [];
-  const level = (id) => config?.rules?.[id];
-  if (level('no-ai-attribution') !== 'off' && /git\s+commit|gh\s+(pr|issue)/.test(text)) {
+  if (/git\s+commit|gh\s+(pr|issue)/.test(text)) {
     // The trailer pattern is anchored to a line start; a one-line command has none.
     const f = attributionFinding(text.replace(/co-authored-by:/gi, '\n$&'), config);
     if (f) found.push(f);
   }
   const m = MERGE_FALLBACK.exec(text);
-  if (m && level('merge-method') !== 'off') {
+  if (m) {
     found.push({
       rule: 'merge-method',
       decision: 'deny',
       message: `git-workflow guard: merge-method: gh pr merge must not use --${m[1]}. Run: gh pr merge <N> --merge --delete-branch.`,
     });
   }
-  return found;
+  return found.map((f) => withLevel(f, config, askSupported)).filter(Boolean);
 }
 
 export async function runCheck({ command, cwd, askSupported = false, env, exec } = {}) {
@@ -108,12 +108,12 @@ export async function runCheck({ command, cwd, askSupported = false, env, exec }
     let findings = [];
     const parsed = parseCommandLine(command, { cwd });
     if (!parsed.ok) {
-      findings = rawFallback(command, config);
+      findings = rawFallback(command, config, askSupported);
       warnings.push('could not parse the command line; only plain-text checks ran');
     } else {
       const out = { leaves: [], failedScripts: [] };
       for (const c of parsed.commands) expand(c, 0, out);
-      for (const s of out.failedScripts) findings.push(...rawFallback(s, config));
+      for (const s of out.failedScripts) findings.push(...rawFallback(s, config, askSupported));
       const groups = new Map();
       for (const leaf of out.leaves) {
         const action = recognise(leaf);

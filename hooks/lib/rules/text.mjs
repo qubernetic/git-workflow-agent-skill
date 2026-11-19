@@ -1,5 +1,6 @@
 // Text rules: commit messages, PR/issue titles and bodies.
 // Rule = {id, applies(action), check(action, ctx) -> Finding|null}
+import { withLevel } from './levels.mjs';
 
 export const TYPES = 'feat|fix|docs|chore|refactor|test|style|perf|ci|build|revert';
 const SUBJECT_RE = new RegExp(`^(${TYPES})(\\([a-z0-9._/-]+\\))?!?: \\S`);
@@ -57,20 +58,10 @@ function commitSubjectFinding(text) {
   return problem ? ruleFinding('conventional-commit', problem) : null;
 }
 
-function applyLevel(findings, config) {
-  const out = [];
-  for (const f of findings) {
-    const level = config?.rules?.[f.rule];
-    if (level === 'off') continue;
-    out.push(level && level !== 'off' ? { ...f, decision: level } : f);
-  }
-  return out;
-}
-
-// Shared with the commit-msg hook.
+// Shared with the commit-msg hook, which cannot ask: a configured `ask` blocks.
 export function checkCommitMessage(text, config) {
   const found = [attributionFinding(text, config), text ? commitSubjectFinding(text) : null].filter(Boolean);
-  return applyLevel(found, config);
+  return found.map((f) => withLevel(f, config, false)).filter(Boolean);
 }
 
 const isCommitLike = (a) => a.tool === 'git' && (a.sub === 'commit' || a.sub === 'tag');

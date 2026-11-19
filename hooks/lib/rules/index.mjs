@@ -2,6 +2,7 @@
 import { TEXT_RULES, checkCommitMessage } from './text.mjs';
 import { MERGE_RULES } from './merge.mjs';
 import { BRANCH_RULES } from './branch.mjs';
+import { levelDecision } from './levels.mjs';
 
 export { checkCommitMessage };
 export const RULES = [...TEXT_RULES, ...MERGE_RULES, ...BRANCH_RULES];
@@ -21,8 +22,8 @@ export async function evaluate(actions, ctx) {
         continue;
       }
       if (!found) continue;
-      findings.push(level && level !== 'warn' ? { ...found, decision: level }
-        : level === 'warn' ? { ...found, decision: 'warn' } : found);
+      const decision = levelDecision(level, found.decision ?? 'deny', Boolean(ctx.askSupported));
+      if (decision) findings.push(decision === found.decision ? found : { ...found, decision });
     }
   }
   return findings;
